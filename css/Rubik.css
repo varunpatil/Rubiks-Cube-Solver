@@ -1,0 +1,75 @@
+body{
+	background-color: lightgrey;
+	margin: 0;
+}
+
+#wrapper{
+
+}
+
+.div1{
+	background-color: red;
+	width:33%;
+	height:100%;
+	position: fixed;
+	left: 0;
+}
+
+.div1Content{
+	padding-top: 10%;
+}
+
+.Centered{
+	display: block;
+   margin: auto auto;
+}
+
+
+#button{
+	display: block;
+	font-size: 10px;
+	background-color: white;
+	color: black;
+	padding: 10px 10px 10px 10px;
+	text-decoration: none;
+	border-radius: 10px;
+	text-transform: uppercase;
+	transition: color 300ms;
+}
+
+
+.div2{
+	background-color: green;
+	width:34%;
+	height:100%;
+	position: fixed;
+	left:33%;
+}
+
+.div3{
+	background-color: red;
+	width:34%;
+	height:100%;
+	position: fixed;
+	left:67%;
+	padding-top: 30px;
+}
+
+#textBox{
+	background-color: white;
+	resize: both;
+	overflow: auto; 
+	padding: 1%;
+	width:80%;
+	height: 52%;
+	margin: auto;
+	font-size: 40px;
+}
+
+#leftImage{
+	
+}
+
+#rightImage{
+	padding: 8% 0 10% 0; 
+}
