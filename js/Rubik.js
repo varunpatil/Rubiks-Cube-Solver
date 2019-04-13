@@ -54,6 +54,39 @@ var print = function()
 	for(var i=1;i<=9;i++)
 		s+=y[i];
 
-document.getElementById("text").innerText=s;
+	document.getElementById("text").innerText=s;
+
+}
+
+var submit = function()
+{
+	print();
+}
+
+var clearAll = function()
+{
+	for(var i=1;i<=9;i++)
+		{
+			if(i!=5)
+			r[i]=w[i]=y[i]=o[i]=b[i]=g[i]='0';
+		}
+	selected_color = "0";
+
+	document.getElementById("text").innerText="";
+	document.getElementById("selectedColor").className="button";
+
+	for(var i=1;i<=9;i++)
+	{
+		if(i!=5)
+		{
+			document.getElementById("R"+String(i)).className="button";
+			document.getElementById("W"+String(i)).className="button";
+			document.getElementById("Y"+String(i)).className="button";
+			document.getElementById("O"+String(i)).className="button";
+			document.getElementById("B"+String(i)).className="button";
+			document.getElementById("G"+String(i)).className="button";
+		}
+	}
+
 
 }

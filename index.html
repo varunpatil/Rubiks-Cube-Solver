@@ -20,11 +20,11 @@
 			
 			<div id="selCol">
 				<p><span style="font-weight: 700; font-family: Arial; font-size: 16px; margin-left:20px;">Selected Color</span></p>
-				<button class="button" id="selectedColor" onclick="print()"></button>
+				<button class="button" id="selectedColor"></button>
 			</div>
 
 			<div id="pickColor">
-				<p><span style="font-weight: 700; font-family: Arial; font-size: 16px; margin-left:20px;">Pick Color</span></p>
+				<p><span style="font-weight: 700; font-family: Arial; font-size: 16px; margin-left:27px;">Pick Color</span></p>
 				<div id="pickGrid">
 					<button class="pickButton" id="R" onclick="pickColor(this.id)">R</button>
 					<button class="pickButton" id="W" onclick="pickColor(this.id)">W</button>
@@ -33,6 +33,10 @@
 					<button class="pickButton" id="B" onclick="pickColor(this.id)">B</button>
 					<button class="pickButton" id="O" onclick="pickColor(this.id)">O</button>
 				</div>
+
+				<button id="submit" onclick="submit()">Submit</button>
+				<button id="clearAll" onclick="clearAll()">Clear All</button>
+
 			</div>
 
 			<div class="red">
@@ -112,7 +116,7 @@
 	<div class="div3">
 		
 		<div id="textBox" class="Centered">
-			<p id="text" style="font-family: Arial;"></p>
+			<p id="text"></p>
 		</div>
 
 		<div id="rightImage">
