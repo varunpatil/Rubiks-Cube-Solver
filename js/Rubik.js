@@ -25,35 +25,40 @@ var selected_color = "0";
 var original = "";
 var final = "";
 var minimum = "";
+var mini = "";
 
 while(minimum.length<200)
 	minimum=minimum+'a';
 
-var mini = minimum;
+while(mini.length<200)
+	mini=mini+'a';
 
-var color=numb=x=leng=0;
+
+var Istore=100,Jstore=100;
+
+var color=0,numb=0,x=0;
 var col="";
-var ix=jx=kx=[0,0,0,0,0];
-
-
+var ix=[0,0,0,0,0],jx=[0,0,0,0,0];
 
 var buttonClick = function(click_id)
 {
 	if(selected_color!="0")
-	document.getElementById(click_id).className="button"+" "+selected_color;
+	{
+		document.getElementById(click_id).className="button"+" "+selected_color;
 
-	if(click_id[0]=='R')
-		r[parseInt(click_id[1])]=selected_color;
-	else if(click_id[0]=='W')
-		w[parseInt(click_id[1])]=selected_color;
-	else if(click_id[0]=='O')
-		o[parseInt(click_id[1])]=selected_color;
-	else if(click_id[0]=='Y')
-		y[parseInt(click_id[1])]=selected_color;
-	else if(click_id[0]=='B')
-		b[parseInt(click_id[1])]=selected_color;
-	else if(click_id[0]=='G')
-		g[parseInt(click_id[1])]=selected_color;
+		if(click_id[0]=='R')
+			r[parseInt(click_id[1])]=selected_color;
+		else if(click_id[0]=='W')
+			w[parseInt(click_id[1])]=selected_color;
+		else if(click_id[0]=='O')
+			o[parseInt(click_id[1])]=selected_color;
+		else if(click_id[0]=='Y')
+			y[parseInt(click_id[1])]=selected_color;
+		else if(click_id[0]=='B')
+			b[parseInt(click_id[1])]=selected_color;
+		else if(click_id[0]=='G')
+			g[parseInt(click_id[1])]=selected_color;
+	}
 }
 
 var pickColor = function(click_id)
@@ -67,30 +72,58 @@ var print = function()
 	s="";
 	for(var i=1;i<=9;i++)
 		s+=r[i];
-	s=s+"\n";
 	for(var i=1;i<=9;i++)
 		s+=b[i];
-	s=s+"\n";
 	for(var i=1;i<=9;i++)
 		s+=w[i];
-	s=s+"\n";
 	for(var i=1;i<=9;i++)
 		s+=g[i];
-	s=s+"\n";
 	for(var i=1;i<=9;i++)
 		s+=o[i];
-	s=s+"\n";
 	for(var i=1;i<=9;i++)
 		s+=y[i];
 
-	console.log(s);
+	if(s.search("0")==-1)
+	document.getElementById("textarea").value=s;
+}
+
+function setCharAt(str,index,chr)
+{
+    if(index > str.length-1) return str;
+    return str.substr(0,index) + chr + str.substr(index+1);
+}
+
+var stringInput = function()
+{
+	var s="";
+	s = document.getElementById("textarea").value;
+	s=s.toUpperCase();
+
+	if(s.length==54 && s.replace(/R/g,"").length==45 && s.replace(/B/g,"").length==45 && s.replace(/W/g,"").length==45 && s.replace(/G/g,"").length==45 && s.replace(/O/g,"").length==45 && s.replace(/Y/g,"").length==45 )
+	{
+		if(s[4]=='R' && s[13]=='B' && s[22]=='W' && s[31]=='G' && s[40]=='O' && s[49]=='Y')
+		{
+			for(var i=0;i<9;i++)
+			{
+				r[i+1]=s[i];
+				b[i+1]=s[i+9];
+				w[i+1]=s[i+18];
+				g[i+1]=s[i+27];
+				o[i+1]=s[i+36];
+				y[i+1]=s[i+45];
+			}
+			paste();
+		}
+	}
+	else
+	{
+		alert("Invalid Input");
+	}
 }
 
 var printSoln = function()
 {
-	console.log(minimum);
-	console.log("Number of Moves = "+String(minimum.length));
-	console.log(col);
+	recompress();
 
 	str="";
 	for(var i=0;i<minimum.length;i++)
@@ -99,10 +132,11 @@ var printSoln = function()
 		{
 			str = str + "\n";
 		}
-		str = str + minimum[i] + " ";
+		str = str + minimum[i] + "   ";
 	}
-	str = str + "\n\nNo of Moves = "+String(minimum.length) + "\n" + col;
+	str = str + "\nNo of Moves = "+String(minimum.length) + "\n" + col;
 
+	if(minimum.length>0)
 	document.getElementById("text").innerText=str;
 }
 
@@ -119,7 +153,6 @@ var submit = function()
 	}
 
 	print();
-//	solve();
 	All_Face_solve();
 
 	printSoln();
@@ -129,31 +162,6 @@ var submit = function()
 var clearAll = function()
 {
 	location.reload();
-	/*
-	for(var i=1;i<=9;i++)
-	{
-		if(i!=5)
-		r[i]=w[i]=y[i]=o[i]=b[i]=g[i]='0';
-	}
-
-	selected_color = "0";
-
-	document.getElementById("text").innerText="";
-	document.getElementById("selectedColor").className="button";
-
-	for(var i=1;i<=9;i++)
-	{
-		if(i!=5)
-		{
-			document.getElementById("R"+String(i)).className="button";
-			document.getElementById("W"+String(i)).className="button";
-			document.getElementById("Y"+String(i)).className="button";
-			document.getElementById("O"+String(i)).className="button";
-			document.getElementById("B"+String(i)).className="button";
-			document.getElementById("G"+String(i)).className="button";
-		}
-	}
-	*/
 }
 
 var paste = function()
@@ -169,10 +177,37 @@ var paste = function()
 	}
 }
 
+var help = function()
+{
+	var s="   ",S="                      ";
+	var A="\n";
+
+	A=A+S+"R7 R8 R9\n";
+	A=A+S+"R4 R5 R6\n";
+	A=A+S+"R1 R2 R3\n\n";
+
+	A=A+s+"B7 B4 B1"+s+"W1 W2 W3"+s+"G1 G4 G7\n"
+	A=A+s+"B8 B5 B2"+s+"W4 W5 W6"+s+"G2 G5 G8\n"
+	A=A+s+"B9 B6 B3"+s+"W7 W8 W9"+s+"G3 G6 G9\n\n"
+
+	A=A+S+"O1 O2 O3\n";
+	A=A+S+"O4 O5 O6\n";
+	A=A+S+"O7 O8 O9\n\n";
+
+	A=A+S+"Y1 Y2 Y3\n";
+	A=A+S+"Y4 Y5 Y6\n";
+	A=A+S+"Y7 Y8 Y9\n\n";
+
+	A=A+"HOLD THE CUBE WITH THE WHITE CENTER FACING YOU, RED CENTER POINTING UP AND GREEN CENTER POINTING RIGHT AS SHOWN ABOVE AND IN THE IMAGE\n\n"
+	A=A+"NOW ENTER THE THE FACE VALUE ( R / B / W / G / O / Y) ONLY\n\n";
+	A=A+"ENTER STARTING FROM R1 TO R9 THEN B1 TO B9 THEN W1 TO W9 THEN G1 TO G9 THEN O1 TO O9 THEN Y1 TO Y9 RESPECTIVELY";
+	alert(A);
+}
+
 ///////////////////////////////////////////////////////////////////////////
 
 function compress()
-{	
+{
 	final="";
 
 	for(var i=0;i<original.length;i++)
@@ -199,7 +234,7 @@ function compress()
 
 var fact = function(n)
 {
-	var i,j,a=[0,0,0,0],use=[0,0,0,0],ans=0;
+	var i=0,j=0,a=[0,0,0,0],use=[0,0,0,0],ans=0;
 
 	i=1;
 	while(n>0)
@@ -430,6 +465,7 @@ var recompress = function()
 
 var transform = function()
 {
+	var v2="";
 	for(var i=minimum.length-1;i>=0;i--)
 	{
 		if(minimum[i]=='X')
@@ -438,42 +474,42 @@ var transform = function()
 			{
 				if(minimum[j]=='U')
 				{
-					minimum[j]='F';
+					minimum = setCharAt(minimum,j,'F');
 				}
 				
 				else if(minimum[j]=='D')
 				{
-					minimum[j]='B';
+					minimum = setCharAt(minimum,j,'B');
 				}
 				
 				else if(minimum[j]=='F')
 				{
-					minimum[j]='D';
+					minimum = setCharAt(minimum,j,'D');
 				}
 				
 				else if(minimum[j]=='B')
 				{
-					minimum[j]='U';
+					minimum = setCharAt(minimum,j,'U');
 				}
 				
 				else if(minimum[j]=='u')
 				{
-					minimum[j]='f';
+					minimum = setCharAt(minimum,j,'f');
 				}
 				
 				else if(minimum[j]=='d')
 				{
-					minimum[j]='b';
+					minimum = setCharAt(minimum,j,'b');
 				}
 				
 				else if(minimum[j]=='f')
 				{
-					minimum[j]='d';
+					minimum = setCharAt(minimum,j,'d');
 				}
 				
 				else if(minimum[j]=='b')
 				{
-					minimum[j]='u';
+					minimum = setCharAt(minimum,j,'u');
 				}
 			}
 		}
@@ -484,42 +520,42 @@ var transform = function()
 			{
 				if(minimum[j]=='R')
 				{
-					minimum[j]='B';
+					minimum = setCharAt(minimum,j,'B');
 				}
 				
 				else if(minimum[j]=='L')
 				{
-					minimum[j]='F';
+					minimum = setCharAt(minimum,j,'F');
 				}
 				
 				else if(minimum[j]=='F')
 				{
-					minimum[j]='R';
+					minimum = setCharAt(minimum,j,'R');
 				}
 				
 				else if(minimum[j]=='B')
 				{
-					minimum[j]='L';
+					minimum = setCharAt(minimum,j,'L');
 				}
 				
 				else if(minimum[j]=='r')
 				{
-					minimum[j]='b';
+					minimum = setCharAt(minimum,j,'b');
 				}
 				
 				else if(minimum[j]=='l')
 				{
-					minimum[j]='f';
+					minimum = setCharAt(minimum,j,'f');
 				}
 				
 				else if(minimum[j]=='f')
 				{
-					minimum[j]='r';
+					minimum = setCharAt(minimum,j,'r');
 				}
 				
 				else if(minimum[j]=='b')
 				{
-					minimum[j]='l';
+					minimum = setCharAt(minimum,j,'l');
 				}
 			}
 		}
@@ -536,7 +572,7 @@ var transform = function()
 			minimum = minimum + v2[i];
 		}
 	}
-	
+
 	if(minimum.length<90)
 	{
 		recompress();
@@ -630,9 +666,9 @@ var solve = function()
 		yx[i]=y[i];
 	}
 	
-	for(var i=23;i>=0;i--)
+	for(var i=0;i<=23;i++)
 	{
-		for(var j=23;j>=0;j--)
+		for(var j=0;j<=23;j++)
 		{		
 			original="";
 			final="";
@@ -1011,10 +1047,12 @@ var solve = function()
 
 
 			compress();
-
+			
 			if(minimum.length>final.length)
 			{
-				minimum=final;		
+				minimum=final;
+				Istore=i;
+				Jstore=j;		
 			}
 		}
 	}
@@ -1165,158 +1203,167 @@ var Bcenter = function()
 
 var All_Face_solve = function()
 {
-	for(var h=1;h<150;h++)
+	s = document.getElementById("textarea").value;
+	if(s.length==54 && s.replace(/R/g,"").length==45 && s.replace(/B/g,"").length==45 && s.replace(/W/g,"").length==45 && s.replace(/G/g,"").length==45 && s.replace(/O/g,"").length==45 && s.replace(/Y/g,"").length==45 )
 	{
-		mini=mini+'a';
-	}
+		////////////////	W center
+		color=1;
+		solve();
+		recompress();
+		mini=minimum;
 
-	////////////////	W center
-	color=1;
-	solve();
-	mini=minimum;
+		//////////////// 	O center
+		for(var s=1;s<=9;s++)
+		{
+			r[s]=ro[s];
+			b[s]=bo[s];
+			w[s]=wo[s];
+			g[s]=go[s];
+			o[s]=oo[s];
+			y[s]=yo[s];
+		}
+		
+		Ocenter();
+		solve();
+		minimum ="X"+ minimum;
+		transform();
+		recompress();
+		
+		if(mini.length>minimum.length)
+		{
+			mini=minimum;
+			color=2;
+		}
+		
+		///////////////		Y center
+		for(var s=1;s<=9;s++)
+		{
+			r[s]=ro[s];
+			b[s]=bo[s];
+			w[s]=wo[s];
+			g[s]=go[s];
+			o[s]=oo[s];
+			y[s]=yo[s];
+		}
+		
+		Ycenter();
+		solve();
+		minimum = "XX"+ minimum;
+		transform();
 
-	//////////////// 	O center
-	for(var s=1;s<=9;s++)
-	{
-		r[s]=ro[s];
-		b[s]=bo[s];
-		w[s]=wo[s];
-		g[s]=go[s];
-		o[s]=oo[s];
-		y[s]=yo[s];
-	}
-	
-	Ocenter();
-	solve();
-	minimum ="X"+ minimum;
-	transform();
-	
-	if(mini.length>minimum.length)
-	{
-		mini=minimum;
-		color=2;
-	}
-	
-	///////////////		Y center
-	for(var s=1;s<=9;s++)
-	{
-		r[s]=ro[s];
-		b[s]=bo[s];
-		w[s]=wo[s];
-		g[s]=go[s];
-		o[s]=oo[s];
-		y[s]=yo[s];
-	}
-	
-	Ycenter();
-	solve();
-	console.log(minimum);
-	minimum = "XX"+ minimum;
-	transform();
-	console.log(minimum);
-	if(mini.length>minimum.length)
-	{
-		mini=minimum;
-		color=3;
-	}
-	
-	////////////////	R Center
-	
-	
-	for(var s=1;s<=9;s++)
-	{
-		r[s]=ro[s];
-		b[s]=bo[s];
-		w[s]=wo[s];
-		g[s]=go[s];
-		o[s]=oo[s];
-		y[s]=yo[s];
-	}
-	
-	Rcenter();
-	solve();
-	
-	minimum = "XXX"+ minimum;
-	transform();
-	
-	if(mini.length>minimum.length)
-	{
-		mini=minimum;
-		color=4;
-	}
-	
-	///////////////		G center
-	
-	for(var s=1;s<=9;s++)
-	{
-		r[s]=ro[s];
-		b[s]=bo[s];
-		w[s]=wo[s];
-		g[s]=go[s];
-		o[s]=oo[s];
-		y[s]=yo[s];
-	}
-	
-	Gcenter();
-	solve();
+		recompress();
 
-	minimum = "Y"+ minimum;
-	transform();
-	
-	if(mini.length>minimum.length)
-	{
-		mini=minimum;
-		color=5;
-	}
-	
-	///////////////		B center
-	
-	for(var s=1;s<=9;s++)
-	{
-		r[s]=ro[s];
-		b[s]=bo[s];
-		w[s]=wo[s];
-		g[s]=go[s];
-		o[s]=oo[s];
-		y[s]=yo[s];
-	}
-	
-	Bcenter();
-	solve();
+		if(mini.length>minimum.length)
+		{
+			mini=minimum;
+			color=3;
+		}
+		
+		////////////////	R Center
+		
+		
+		for(var s=1;s<=9;s++)
+		{
+			r[s]=ro[s];
+			b[s]=bo[s];
+			w[s]=wo[s];
+			g[s]=go[s];
+			o[s]=oo[s];
+			y[s]=yo[s];
+		}
+		
+		Rcenter();
+		solve();
+		
+		minimum = "XXX"+ minimum;
+		transform();
+		recompress();
 
-	minimum = "YYY"+ minimum;
-	transform();
-	
-	if(mini.length>minimum.length)
-	{
-		mini=minimum;
-		color=6;
+		if(mini.length>minimum.length)
+		{
+			mini=minimum;
+			color=4;
+		}
+		
+		///////////////		G center
+		
+		for(var s=1;s<=9;s++)
+		{
+			r[s]=ro[s];
+			b[s]=bo[s];
+			w[s]=wo[s];
+			g[s]=go[s];
+			o[s]=oo[s];
+			y[s]=yo[s];
+		}
+		
+		Gcenter();
+		solve();
+
+		minimum = "Y"+ minimum;
+		transform();
+		recompress();
+		
+		if(mini.length>minimum.length)
+		{
+			mini=minimum;
+			color=5;
+		}
+		
+		///////////////		B center
+		
+		for(var s=1;s<=9;s++)
+		{
+			r[s]=ro[s];
+			b[s]=bo[s];
+			w[s]=wo[s];
+			g[s]=go[s];
+			o[s]=oo[s];
+			y[s]=yo[s];
+		}
+		
+		Bcenter();
+		solve();
+
+		minimum = "YYY"+ minimum;
+		transform();
+		recompress();
+		
+		if(mini.length>minimum.length)
+		{
+			mini=minimum;
+			color=6;
+		}
+		
+		////////////////////// END	
+		
+		minimum=mini;
+		
+		switch(color)
+		{
+			case 1:
+				col="WHITE";
+				break;
+			case 2:
+				col="ORANGE";
+				break;
+			case 3:
+				col="YELLOW";
+				break;
+			case 4:
+				col="RED";
+				break;
+			case 5:
+				col="GREEN";
+				break;
+			case 6:
+				col="BLUE";
+				break;	
+		}
 	}
-	
-	////////////////////// END	
-	
-	minimum=mini;
-	
-	switch(color)
+	else
 	{
-		case 1:
-			col="WHITE";
-			break;
-		case 2:
-			col="ORANGE";
-			break;
-		case 3:
-			col="YELLOW";
-			break;
-		case 4:
-			col="RED";
-			break;
-		case 5:
-			col="GREEN";
-			break;
-		case 6:
-			col="BLUE";
-			break;	
+		alert("Invalid Sudoku");
 	}
 }
 
