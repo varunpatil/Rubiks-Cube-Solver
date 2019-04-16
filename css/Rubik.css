@@ -244,14 +244,16 @@ body{
 
 
 #textBox{
+	font-family: Arial;
 	background-color: white;
+	font-weight: 700;
 	resize: both;
 	overflow: auto; 
 	padding: 1%;
 	width:60%;
 	height: 52%;
 	margin: auto;
-	font-size: 40px;
+	font-size: 20px;
 }
 
 #switchButton{
