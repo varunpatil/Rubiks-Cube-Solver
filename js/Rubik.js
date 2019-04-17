@@ -27,12 +27,18 @@ var final = "";
 var minimum = "";
 var mini = "";
 
+var Invalid = false;
+
+maxTime = 1000;
+
 while(minimum.length<200)
 	minimum=minimum+'a';
 
 while(mini.length<200)
 	mini=mini+'a';
 
+var d = new Date();
+var startT = d.getTime();
 
 var Istore=100,Jstore=100;
 
@@ -124,7 +130,6 @@ var stringInput = function()
 var printSoln = function()
 {
 	recompress();
-
 	str="";
 	for(var i=0;i<minimum.length;i++)
 	{
@@ -132,7 +137,7 @@ var printSoln = function()
 		{
 			str = str + "\n";
 		}
-		str = str + minimum[i] + "   ";
+		str = str + minimum[i] + " ";
 	}
 	str = str + "\nNo of Moves = "+String(minimum.length) + "\n" + col;
 
@@ -142,21 +147,33 @@ var printSoln = function()
 
 var submit = function()
 {
-	for(var i=1;i<=9;i++)
-	{
-		ro[i]=r[i];
-		bo[i]=b[i];
-		wo[i]=w[i];
-		go[i]=g[i];
-		oo[i]=o[i];
-		yo[i]=y[i];
+	document.getElementById("text").innerText="";
+	Invalid = false;
+	sub: {
+		d = new Date();
+		startT = d.getTime();
+
+		for(var i=1;i<=9;i++)
+		{
+			ro[i]=r[i];
+			bo[i]=b[i];
+			wo[i]=w[i];
+			go[i]=g[i];
+			oo[i]=o[i];
+			yo[i]=y[i];
+		}
+
+		print();
+		All_Face_solve();
+
+		if(Invalid == true)
+		{
+			break sub;
+		}
+
+		printSoln();
+		paste();
 	}
-
-	print();
-	All_Face_solve();
-
-	printSoln();
-	paste();
 }
 
 var clearAll = function()
@@ -653,406 +670,513 @@ function check_if_solved()
 
 var solve = function()
 {
-	while(minimum.length<200)
-	minimum=minimum+'a';
-
-	for(var i=1;i<=9;i++)
+	BRsolve: 
 	{
-		rx[i]=r[i];
-		bx[i]=b[i];
-		wx[i]=w[i];
-		gx[i]=g[i];
-		ox[i]=o[i];
-		yx[i]=y[i];
-	}
-	
-	for(var i=0;i<=23;i++)
-	{
-		for(var j=0;j<=23;j++)
-		{		
-			original="";
-			final="";
+		while(minimum.length<200)
+		minimum=minimum+'a';
 
-			for(var s=1;s<=9;s++)
-			{
-				r[s]=rx[s];
-				b[s]=bx[s];
-				w[s]=wx[s];
-				g[s]=gx[s];
-				o[s]=ox[s];
-				y[s]=yx[s];
-			}
-			
-			x=fact(i);
-			ix[4]=x%10;
-			x=Math.floor(x/10);
-			ix[3]=x%10;
-			x=Math.floor(x/10);
-			ix[2]=x%10;
-			x=Math.floor(x/10);
-			ix[1]=x%10;
-			
-			x=fact(j);
-			jx[4]=x%10;
-			x=Math.floor(x/10);
-			jx[3]=x%10;
-			x=Math.floor(x/10);
-			jx[2]=x%10;
-			x=Math.floor(x/10);
-			jx[1]=x%10;
-			
-			//////////////////////////////// WHITE CROSS		use I
-			
-			while(check_white_cross()==0)
-			{
-				goWC(ix[1]);
-				goWC(ix[2]);
-				goWC(ix[3]);
-				goWC(ix[4]);
-			}
-				
-			///////////////////////////////  WHITE FACE FULL	use j
-			
-			while(check_layer2()==0)
-			{	
-				goL2(jx[1]);
-				goL2(jx[2]);
-				goL2(jx[3]);
-				goL2(jx[4]);
-			}
-			
-			
-			///////////////////////////////  YELLOW CROSS
+		for(var i=1;i<=9;i++)
+		{
+			rx[i]=r[i];
+			bx[i]=b[i];
+			wx[i]=w[i];
+			gx[i]=g[i];
+			ox[i]=o[i];
+			yx[i]=y[i];
+		}
+		
+		for(var i=0;i<=23;i++)
+		{
+			for(var j=0;j<=23;j++)
+			{		
+				original="";
+				final="";
 
-			while(check_yellow_cross()==0)
-			{
-				
-				if(  ( y[8]=='Y' && y[6]=='Y' && y[2]!='Y' && y[4]!='Y' )  ||   (y[2]!='Y' && y[4]!='Y' && y[6]!='Y' && y[8]!='Y')   ||   (  y[4]=='Y' && y[6]=='Y' && y[2]!='Y' && y[8]!='Y' )   )
+				for(var s=1;s<=9;s++)
 				{
-					U(); R(); B(); Rs(); Bs(); Us();
+					r[s]=rx[s];
+					b[s]=bx[s];
+					w[s]=wx[s];
+					g[s]=gx[s];
+					o[s]=ox[s];
+					y[s]=yx[s];
 				}
 				
-				else if(   ( y[8]=='Y' && y[4]=='Y' && y[2]!='Y' && y[6]!='Y' )  ||   (y[2]=='Y' && y[8]=='Y' && y[4]!='Y' && y[6]!='Y')   )
-				{
-					L(); U(); B(); Us(); Bs(); Ls();
-				}
+				x=fact(i);
+				ix[4]=x%10;
+				x=Math.floor(x/10);
+				ix[3]=x%10;
+				x=Math.floor(x/10);
+				ix[2]=x%10;
+				x=Math.floor(x/10);
+				ix[1]=x%10;
 				
-				else if( y[4]=='Y' && y[2]=='Y' && y[8]!='Y' && y[6]!='Y' )
-				{
-					D(); L(); B(); Ls(); Bs(); Ds();
-				}
+				x=fact(j);
+				jx[4]=x%10;
+				x=Math.floor(x/10);
+				jx[3]=x%10;
+				x=Math.floor(x/10);
+				jx[2]=x%10;
+				x=Math.floor(x/10);
+				jx[1]=x%10;
 				
-				else if( y[6]=='Y' && y[2]=='Y' && y[4]!='Y' && y[8]!='Y' )
-				{
-					R(); D(); B(); Ds(); Bs(); Rs();
-				}
+				//////////////////////////////// WHITE CROSS		use I
 				
-			}
-
-
-			////////////////////////////////  ORIENTED YELLOW CROSS
-			
-			while(check_ORyellow_cross()==0)
-			{
-				while  ( !( ( r[8]=='R' && b[8]=='B' ) || ( r[8]=='R' && g[8]=='G' ) || ( r[8]=='R' && o[8]=='O' ) || ( b[8]=='B' && g[8]=='G' ) || ( b[8]=='B' && o[8]=='O' ) || ( g[8]=='G' && o[8]=='O' ) ))
+				while(check_white_cross()==0)
 				{
-					B();
-				}
-				
-				if(  g[8]=='G' && o[8]=='O' )
-				{
-					U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Bs();
-				}
-				else if( b[8]=='B' && o[8]=='O' )
-				{
-					R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Bs();
-				}
-				else if( b[8]=='B' && g[8]=='G'  )
-				{
-					U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Bs(); L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Bs();
-				}
-				else if(  r[8]=='R' && o[8]=='O' )
-				{
-					L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Bs(); D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Bs();
-				}
-				else if(   r[8]=='R' && g[8]=='G' )
-				{
-					L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Bs();
-				}
-				else if( r[8]=='R' && b[8]=='B' )
-				{
-					D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Bs();
-				}
-			}
-			
-			
-			////////////////////////////////  ORIENTED CORNERS
-			
-			
-			while(check_corner()==0)
-			{
-				if(rby())
-				{
-					if( (r[9]=='B' && g[7]=='Y' && y[9]=='O') || (r[9]=='O' && g[7]=='B' && y[9]=='Y') || (r[9]=='Y' && g[7]=='O' && y[9]=='B') )
+					var d = new Date();
+					var now = d.getTime();
+					if(now-startT>maxTime)
 					{
-						Ds(); B(); U(); Bs(); D(); B(); Us(); Bs();
+						for(var s=1;s<=9;s++)
+						{
+							r[s]=ro[s];
+							b[s]=bo[s];
+							w[s]=wo[s];
+							g[s]=go[s];
+							o[s]=oo[s];
+							y[s]=yo[s];
+						}
+						alert("Invalid configuration")
+						Invalid = true;
+						break BRsolve;
 					}
-					else 
-					{
-						B(); U(); Bs(); Ds(); B(); Us(); Bs(); D();
-					}
+
+					goWC(ix[1]);
+					goWC(ix[2]);
+					goWC(ix[3]);
+					goWC(ix[4]);
 				}
-				else if(oby())
+					
+				///////////////////////////////  WHITE FACE FULL	use j
+				
+				while(check_layer2()==0)
 				{
-					if( (r[9]=='R' && g[7]=='Y' && y[9]=='B') || (r[9]=='B' && g[7]=='R' && y[9]=='Y') || (r[9]=='Y' && g[7]=='B' && y[9]=='R') )
+					var d = new Date();
+					var now = d.getTime();
+					if(now-startT>maxTime)
 					{
-						Rs(); B(); L(); Bs(); R(); B(); Ls(); Bs();
+						for(var s=1;s<=9;s++)
+						{
+							r[s]=ro[s];
+							b[s]=bo[s];
+							w[s]=wo[s];
+							g[s]=go[s];
+							o[s]=oo[s];
+							y[s]=yo[s];
+						}
+						alert("Invalid configuration")
+						Invalid = true;
+						break BRsolve;
 					}
-					else
+
+					goL2(jx[1]);
+					goL2(jx[2]);
+					goL2(jx[3]);
+					goL2(jx[4]);
+				}
+				
+				
+				///////////////////////////////  YELLOW CROSS
+
+				while(check_yellow_cross()==0)
+				{
+					var d = new Date();
+					var now = d.getTime();
+					if(now-startT>maxTime)
 					{
-						B(); L(); Bs(); Rs(); B(); Ls(); Bs(); R();
+						for(var s=1;s<=9;s++)
+						{
+							r[s]=ro[s];
+							b[s]=bo[s];
+							w[s]=wo[s];
+							g[s]=go[s];
+							o[s]=oo[s];
+							y[s]=yo[s];
+						}
+						alert("Invalid configuration")
+						Invalid = true;
+						break BRsolve;
+					}
+					
+					if(  ( y[8]=='Y' && y[6]=='Y' && y[2]!='Y' && y[4]!='Y' )  ||   (y[2]!='Y' && y[4]!='Y' && y[6]!='Y' && y[8]!='Y')   ||   (  y[4]=='Y' && y[6]=='Y' && y[2]!='Y' && y[8]!='Y' )   )
+					{
+						U(); R(); B(); Rs(); Bs(); Us();
+					}
+					
+					else if(   ( y[8]=='Y' && y[4]=='Y' && y[2]!='Y' && y[6]!='Y' )  ||   (y[2]=='Y' && y[8]=='Y' && y[4]!='Y' && y[6]!='Y')   )
+					{
+						L(); U(); B(); Us(); Bs(); Ls();
+					}
+					
+					else if( y[4]=='Y' && y[2]=='Y' && y[8]!='Y' && y[6]!='Y' )
+					{
+						D(); L(); B(); Ls(); Bs(); Ds();
+					}
+					
+					else if( y[6]=='Y' && y[2]=='Y' && y[4]!='Y' && y[8]!='Y' )
+					{
+						R(); D(); B(); Ds(); Bs(); Rs();
 					}
 					
 				}
+
+
+				////////////////////////////////  ORIENTED YELLOW CROSS
 				
-				else if(ogy())
+				while(check_ORyellow_cross()==0)
 				{
-					if( (r[9]=='R' && g[7]=='Y' && y[9]=='B') || (r[9]=='B' && g[7]=='R' && y[9]=='Y') || (r[9]=='Y' && g[7]=='B' && y[9]=='R') )
+					var d = new Date();
+					var now = d.getTime();
+					if(now-startT>maxTime)
 					{
-						Us(); B(); D(); Bs(); U(); B(); Ds(); Bs();
+						for(var s=1;s<=9;s++)
+						{
+							r[s]=ro[s];
+							b[s]=bo[s];
+							w[s]=wo[s];
+							g[s]=go[s];
+							o[s]=oo[s];
+							y[s]=yo[s];
+						}
+						alert("Invalid configuration")
+						Invalid = true;
+						break BRsolve;
 					}
-					else
+
+					while  ( !( ( r[8]=='R' && b[8]=='B' ) || ( r[8]=='R' && g[8]=='G' ) || ( r[8]=='R' && o[8]=='O' ) || ( b[8]=='B' && g[8]=='G' ) || ( b[8]=='B' && o[8]=='O' ) || ( g[8]=='G' && o[8]=='O' ) ))
 					{
-						B(); D(); Bs(); Us(); B(); Ds(); Bs(); U();
+						B();
 					}
 					
+					if(  g[8]=='G' && o[8]=='O' )
+					{
+						U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Bs();
+					}
+					else if( b[8]=='B' && o[8]=='O' )
+					{
+						R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Bs();
+					}
+					else if( b[8]=='B' && g[8]=='G'  )
+					{
+						U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Bs(); L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Bs();
+					}
+					else if(  r[8]=='R' && o[8]=='O' )
+					{
+						L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Bs(); D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Bs();
+					}
+					else if(   r[8]=='R' && g[8]=='G' )
+					{
+						L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Bs();
+					}
+					else if( r[8]=='R' && b[8]=='B' )
+					{
+						D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Bs();
+					}
 				}
 				
-				else
+				
+				////////////////////////////////  ORIENTED CORNERS
+				
+				
+				while(check_corner()==0)
 				{
-					if( (r[1]=='Y' && b[7]=='B' && y[7]=='O') || (r[9]=='O' && g[7]=='Y' && y[9]=='B') || (r[9]=='B' && g[7]=='O' && y[9]=='Y') )
+					var d = new Date();
+					var now = d.getTime();
+					if(now-startT>maxTime)
 					{
-						Ls(); B(); R(); Bs(); L(); B(); Rs(); Bs();
+						for(var s=1;s<=9;s++)
+						{
+							r[s]=ro[s];
+							b[s]=bo[s];
+							w[s]=wo[s];
+							g[s]=go[s];
+							o[s]=oo[s];
+							y[s]=yo[s];
+						}
+						alert("Invalid configuration")
+						Invalid = true;
+						break BRsolve;
 					}
-					else
+
+					if(rby())
 					{
-						B(); R(); Bs(); Ls(); B(); Rs(); Bs(); L();
+						if( (r[9]=='B' && g[7]=='Y' && y[9]=='O') || (r[9]=='O' && g[7]=='B' && y[9]=='Y') || (r[9]=='Y' && g[7]=='O' && y[9]=='B') )
+						{
+							Ds(); B(); U(); Bs(); D(); B(); Us(); Bs();
+						}
+						else 
+						{
+							B(); U(); Bs(); Ds(); B(); Us(); Bs(); D();
+						}
+					}
+					else if(oby())
+					{
+						if( (r[9]=='R' && g[7]=='Y' && y[9]=='B') || (r[9]=='B' && g[7]=='R' && y[9]=='Y') || (r[9]=='Y' && g[7]=='B' && y[9]=='R') )
+						{
+							Rs(); B(); L(); Bs(); R(); B(); Ls(); Bs();
+						}
+						else
+						{
+							B(); L(); Bs(); Rs(); B(); Ls(); Bs(); R();
+						}
+						
 					}
 					
+					else if(ogy())
+					{
+						if( (r[9]=='R' && g[7]=='Y' && y[9]=='B') || (r[9]=='B' && g[7]=='R' && y[9]=='Y') || (r[9]=='Y' && g[7]=='B' && y[9]=='R') )
+						{
+							Us(); B(); D(); Bs(); U(); B(); Ds(); Bs();
+						}
+						else
+						{
+							B(); D(); Bs(); Us(); B(); Ds(); Bs(); U();
+						}
+						
+					}
+					
+					else
+					{
+						if( (r[1]=='Y' && b[7]=='B' && y[7]=='O') || (r[9]=='O' && g[7]=='Y' && y[9]=='B') || (r[9]=='B' && g[7]=='O' && y[9]=='Y') )
+						{
+							Ls(); B(); R(); Bs(); L(); B(); Rs(); Bs();
+						}
+						else
+						{
+							B(); R(); Bs(); Ls(); B(); Rs(); Bs(); L();
+						}
+						
+					}
 				}
-			}
-			
-			
-			////////////////////////////////  COMPLETE CUBE
-			
-			while(check_if_solved()==0)
-			{
-				//////////////////////		2 ADJ
 				
-				// R
 				
-				if(y[1]=='Y' && y[3]=='Y')
+				////////////////////////////////  COMPLETE CUBE
+				
+				while(check_if_solved()==0)
 				{
-					if(r[7]=='Y' && r[9]=='Y')
+					//////////////////////		2 ADJ
+					
+					// R
+
+					var d = new Date();
+					var now = d.getTime();
+					if(now-startT>maxTime)
+					{
+						for(var s=1;s<=9;s++)
+						{
+							r[s]=ro[s];
+							b[s]=bo[s];
+							w[s]=wo[s];
+							g[s]=go[s];
+							o[s]=oo[s];
+							y[s]=yo[s];
+						}
+						alert("Invalid configuration")
+						Invalid = true;
+						break BRsolve;
+					}
+					
+					if(y[1]=='Y' && y[3]=='Y')
+					{
+						if(r[7]=='Y' && r[9]=='Y')
+						{
+							U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Ds(); B(); B(); D(); B(); Ds(); B(); D();
+						}
+						
+						else
+						{
+							Ds(); Bs(); D(); Bs(); Ds(); B(); B(); D(); U(); B(); Us(); B(); U(); B(); B(); Us();
+						}	
+					}
+					
+					// B
+					
+					else if(y[3]=='Y' && y[9]=='Y')
+					{
+						if(b[7]=='Y' && b[9]=='Y')
+						{
+							L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Rs(); B(); B(); R(); B(); Rs(); B(); R();
+						}
+						else
+						{
+							Rs(); Bs(); R(); Bs(); Rs(); B(); B(); R(); L(); B(); Ls(); B(); L(); B(); B(); Ls();
+						}
+					}
+					
+					// O
+					
+					else if(y[7]=='Y' && y[9]=='Y')
+					{
+						if(o[7]=='Y' && o[9]=='Y')
+						{
+							D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Us(); B(); B(); U(); B(); Us(); B(); U();
+						}
+						else
+						{
+							Us(); Bs(); U(); Bs(); Us(); B(); B(); U(); D(); B(); Ds(); B(); D(); B(); B(); Ds();
+						}
+					}
+					
+					// G
+					
+					else if(y[1]=='Y' && y[7]=='Y')
+					{
+						if(g[7]=='Y' && g[9]=='Y')
+						{
+							R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
+						}
+						else
+						{
+							Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
+						}
+					}
+					
+					///////////////////////////		2 DIAG
+					
+					else if(y[1]=='Y' && y[9]=='Y')
+					{
+						if(r[7]=='Y' && g[9]=='Y')
+						{
+							U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Ds(); B(); B(); D(); B(); Ds(); B(); D();
+							R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
+						}
+						else 
+						{
+							Ds(); Bs(); D(); Bs(); Ds(); B(); B(); D(); U(); B(); Us(); B(); U(); B(); B(); Us();
+							Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
+						}	
+					}
+					
+					else if(y[3]=='Y' && y[7]=='Y')
+					{
+						if(g[7]=='Y' && o[7]=='Y')
+						{
+							R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
+							D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Us(); B(); B(); U(); B(); Us(); B(); U();
+						}
+						else
+						{
+							Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
+							Us(); Bs(); U(); Bs(); Us(); B(); B(); U(); D(); B(); Ds(); B(); D(); B(); B(); Ds();
+						}
+					}
+					
+					/////////////////////////////		3 Y up
+					
+					
+					else if(y[1]=='Y')
+					{
+						if(r[7]=='Y' && g[7]=='G' && o[9]=='Y')
+						{
+							U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Ds(); B(); B(); D(); B(); Ds(); B(); D();
+							Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
+						}
+						else
+						{
+							Ds(); Bs(); D(); Bs(); Ds(); B(); B(); D(); U(); B(); Us(); B(); U(); B(); B(); Us();
+							R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
+						}
+					}
+					
+					else if(y[3]=='Y')
+					{
+						if(b[9]=='Y' && r[7]=='Y' && g[7]=='Y')
+						{
+							L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Rs(); B(); B(); R(); B(); Rs(); B(); R();
+							Ds(); Bs(); D(); Bs(); Ds(); B(); B(); D(); U(); B(); Us(); B(); U(); B(); B(); Us();
+						}
+						else
+						{
+							Rs(); Bs(); R(); Bs(); Rs(); B(); B(); R(); L(); B(); Ls(); B(); L(); B(); B(); Ls();
+							U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Ds(); B(); B(); D(); B(); Ds(); B(); D();
+						}
+					}
+					
+					else if(y[7]=='Y')
+					{
+						if(g[7]=='Y' && o[9]=='Y' && b[9]=='Y')
+						{
+							R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
+							Us(); Bs(); U(); Bs(); Us(); B(); B(); U(); D(); B(); Ds(); B(); D(); B(); B(); Ds();
+						}
+						else
+						{
+							Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
+							D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Us(); B(); B(); U(); B(); Us(); B(); U();
+						}
+					}
+					
+					else if(y[9]=='Y')
+					{
+						if(r[7]=='Y' && b[9]=='Y' && o[9]=='Y')
+						{
+							D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Us(); B(); B(); U(); B(); Us(); B(); U();
+							Rs(); Bs(); R(); Bs(); Rs(); B(); B(); R(); L(); B(); Ls(); B(); L(); B(); B(); Ls();
+						}
+						else
+						{
+							Us(); Bs(); U(); Bs(); Us(); B(); B(); U(); D(); B(); Ds(); B(); D(); B(); B(); Ds();
+							L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Rs(); B(); B(); R(); B(); Rs(); B(); R();
+						}
+					}
+					
+					/////////////////////////////		all 4 messed up
+					
+					
+					// R
+					
+					else if(r[7]=='Y' && r[9]=='Y')
 					{
 						U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Ds(); B(); B(); D(); B(); Ds(); B(); D();
 					}
-					
-					else
+						
+					else if(b[7]=='Y' && g[7]=='Y')
 					{
 						Ds(); Bs(); D(); Bs(); Ds(); B(); B(); D(); U(); B(); Us(); B(); U(); B(); B(); Us();
+					}
+					
+					// B
+					
+					else if(b[7]=='Y' && b[9]=='Y')
+					{
+						L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Rs(); B(); B(); R(); B(); Rs(); B(); R();
+					}
+					
+					else if(b[7]=='R' && b[9]=='O')
+					{
+						Rs(); Bs(); R(); Bs(); Rs(); B(); B(); R(); L(); B(); Ls(); B(); L(); B(); B(); Ls();
+					}
+					
+					// O
+					
+					else if(o[7]=='Y' && o[9]=='Y')
+					{
+						D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Us(); B(); B(); U(); B(); Us(); B(); U();
+					}
+					else if(o[7]=='B' && o[9]=='G')
+					{
+						Us(); Bs(); U(); Bs(); Us(); B(); B(); U(); D(); B(); Ds(); B(); D(); B(); B(); Ds();
+					}
+					
+					// G
+					
+					else if(g[7]=='Y' && g[9]=='Y')
+					{
+						R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
+					}
+					else if(g[7]=='R' && g[9]=='O')
+					{
+						Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
 					}	
 				}
-				
-				// B
-				
-				else if(y[3]=='Y' && y[9]=='Y')
-				{
-					if(b[7]=='Y' && b[9]=='Y')
-					{
-						L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Rs(); B(); B(); R(); B(); Rs(); B(); R();
-					}
-					else
-					{
-						Rs(); Bs(); R(); Bs(); Rs(); B(); B(); R(); L(); B(); Ls(); B(); L(); B(); B(); Ls();
-					}
-				}
-				
-				// O
-				
-				else if(y[7]=='Y' && y[9]=='Y')
-				{
-					if(o[7]=='Y' && o[9]=='Y')
-					{
-						D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Us(); B(); B(); U(); B(); Us(); B(); U();
-					}
-					else
-					{
-						Us(); Bs(); U(); Bs(); Us(); B(); B(); U(); D(); B(); Ds(); B(); D(); B(); B(); Ds();
-					}
-				}
-				
-				// G
-				
-				else if(y[1]=='Y' && y[7]=='Y')
-				{
-					if(g[7]=='Y' && g[9]=='Y')
-					{
-						R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
-					}
-					else
-					{
-						Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
-					}
-				}
-				
-				///////////////////////////		2 DIAG
-				
-				else if(y[1]=='Y' && y[9]=='Y')
-				{
-					if(r[7]=='Y' && g[9]=='Y')
-					{
-						U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Ds(); B(); B(); D(); B(); Ds(); B(); D();
-						R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
-					}
-					else 
-					{
-						Ds(); Bs(); D(); Bs(); Ds(); B(); B(); D(); U(); B(); Us(); B(); U(); B(); B(); Us();
-						Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
-					}	
-				}
-				
-				else if(y[3]=='Y' && y[7]=='Y')
-				{
-					if(g[7]=='Y' && o[7]=='Y')
-					{
-						R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
-						D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Us(); B(); B(); U(); B(); Us(); B(); U();
-					}
-					else
-					{
-						Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
-						Us(); Bs(); U(); Bs(); Us(); B(); B(); U(); D(); B(); Ds(); B(); D(); B(); B(); Ds();
-					}
-				}
-				
-				/////////////////////////////		3 Y up
-				
-				
-				else if(y[1]=='Y')
-				{
-					if(r[7]=='Y' && g[7]=='G' && o[9]=='Y')
-					{
-						U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Ds(); B(); B(); D(); B(); Ds(); B(); D();
-						Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
-					}
-					else
-					{
-						Ds(); Bs(); D(); Bs(); Ds(); B(); B(); D(); U(); B(); Us(); B(); U(); B(); B(); Us();
-						R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
-					}
-				}
-				
-				else if(y[3]=='Y')
-				{
-					if(b[9]=='Y' && r[7]=='Y' && g[7]=='Y')
-					{
-						L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Rs(); B(); B(); R(); B(); Rs(); B(); R();
-						Ds(); Bs(); D(); Bs(); Ds(); B(); B(); D(); U(); B(); Us(); B(); U(); B(); B(); Us();
-					}
-					else
-					{
-						Rs(); Bs(); R(); Bs(); Rs(); B(); B(); R(); L(); B(); Ls(); B(); L(); B(); B(); Ls();
-						U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Ds(); B(); B(); D(); B(); Ds(); B(); D();
-					}
-				}
-				
-				else if(y[7]=='Y')
-				{
-					if(g[7]=='Y' && o[9]=='Y' && b[9]=='Y')
-					{
-						R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
-						Us(); Bs(); U(); Bs(); Us(); B(); B(); U(); D(); B(); Ds(); B(); D(); B(); B(); Ds();
-					}
-					else
-					{
-						Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
-						D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Us(); B(); B(); U(); B(); Us(); B(); U();
-					}
-				}
-				
-				else if(y[9]=='Y')
-				{
-					if(r[7]=='Y' && b[9]=='Y' && o[9]=='Y')
-					{
-						D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Us(); B(); B(); U(); B(); Us(); B(); U();
-						Rs(); Bs(); R(); Bs(); Rs(); B(); B(); R(); L(); B(); Ls(); B(); L(); B(); B(); Ls();
-					}
-					else
-					{
-						Us(); Bs(); U(); Bs(); Us(); B(); B(); U(); D(); B(); Ds(); B(); D(); B(); B(); Ds();
-						L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Rs(); B(); B(); R(); B(); Rs(); B(); R();
-					}
-				}
-				
-				/////////////////////////////		all 4 messed up
-				
-				
-				// R
-				
-				else if(r[7]=='Y' && r[9]=='Y')
-				{
-					U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Ds(); B(); B(); D(); B(); Ds(); B(); D();
-				}
-					
-				else if(b[7]=='Y' && g[7]=='Y')
-				{
-					Ds(); Bs(); D(); Bs(); Ds(); B(); B(); D(); U(); B(); Us(); B(); U(); B(); B(); Us();
-				}
-				
-				// B
-				
-				else if(b[7]=='Y' && b[9]=='Y')
-				{
-					L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Rs(); B(); B(); R(); B(); Rs(); B(); R();
-				}
-				
-				else if(b[7]=='R' && b[9]=='O')
-				{
-					Rs(); Bs(); R(); Bs(); Rs(); B(); B(); R(); L(); B(); Ls(); B(); L(); B(); B(); Ls();
-				}
-				
-				// O
-				
-				else if(o[7]=='Y' && o[9]=='Y')
-				{
-					D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Us(); B(); B(); U(); B(); Us(); B(); U();
-				}
-				else if(o[7]=='B' && o[9]=='G')
-				{
-					Us(); Bs(); U(); Bs(); Us(); B(); B(); U(); D(); B(); Ds(); B(); D(); B(); B(); Ds();
-				}
-				
-				// G
-				
-				else if(g[7]=='Y' && g[9]=='Y')
-				{
-					R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
-				}
-				else if(g[7]=='R' && g[9]=='O')
-				{
-					Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
-				}	
-			}
 
-
-			compress();
-			
-			if(minimum.length>final.length)
-			{
-				minimum=final;
-				Istore=i;
-				Jstore=j;		
+				compress();
+				
+				if(minimum.length>final.length)
+				{
+					minimum=final;	
+				}
 			}
 		}
 	}
@@ -1203,167 +1327,176 @@ var Bcenter = function()
 
 var All_Face_solve = function()
 {
-	s = document.getElementById("textarea").value;
-	if(s.length==54 && s.replace(/R/g,"").length==45 && s.replace(/B/g,"").length==45 && s.replace(/W/g,"").length==45 && s.replace(/G/g,"").length==45 && s.replace(/O/g,"").length==45 && s.replace(/Y/g,"").length==45 )
+	BRallsolve:
 	{
-		////////////////	W center
-		color=1;
-		solve();
-		recompress();
-		mini=minimum;
+		s = document.getElementById("textarea").value;
+		if(s.length==54 && s.replace(/R/g,"").length==45 && s.replace(/B/g,"").length==45 && s.replace(/W/g,"").length==45 && s.replace(/G/g,"").length==45 && s.replace(/O/g,"").length==45 && s.replace(/Y/g,"").length==45 )
+		{
+			////////////////	W center
+			color=1;
+			solve();
 
-		//////////////// 	O center
-		for(var s=1;s<=9;s++)
-		{
-			r[s]=ro[s];
-			b[s]=bo[s];
-			w[s]=wo[s];
-			g[s]=go[s];
-			o[s]=oo[s];
-			y[s]=yo[s];
-		}
-		
-		Ocenter();
-		solve();
-		minimum ="X"+ minimum;
-		transform();
-		recompress();
-		
-		if(mini.length>minimum.length)
-		{
+			if(Invalid==true)
+			{
+				break BRallsolve;
+			}
+
+			recompress();
 			mini=minimum;
-			color=2;
-		}
-		
-		///////////////		Y center
-		for(var s=1;s<=9;s++)
-		{
-			r[s]=ro[s];
-			b[s]=bo[s];
-			w[s]=wo[s];
-			g[s]=go[s];
-			o[s]=oo[s];
-			y[s]=yo[s];
-		}
-		
-		Ycenter();
-		solve();
-		minimum = "XX"+ minimum;
-		transform();
 
-		recompress();
+			//////////////// 	O center
+			for(var s=1;s<=9;s++)
+			{
+				r[s]=ro[s];
+				b[s]=bo[s];
+				w[s]=wo[s];
+				g[s]=go[s];
+				o[s]=oo[s];
+				y[s]=yo[s];
+			}
+			
+			Ocenter();
+			solve();
+			minimum ="X"+ minimum;
+			transform();
+			recompress();
+			
+			if(mini.length>minimum.length)
+			{
+				mini=minimum;
+				color=2;
+			}
+			
+			///////////////		Y center
+			for(var s=1;s<=9;s++)
+			{
+				r[s]=ro[s];
+				b[s]=bo[s];
+				w[s]=wo[s];
+				g[s]=go[s];
+				o[s]=oo[s];
+				y[s]=yo[s];
+			}
+			
+			Ycenter();
+			solve();
+			minimum = "XX"+ minimum;
+			transform();
 
-		if(mini.length>minimum.length)
-		{
-			mini=minimum;
-			color=3;
-		}
-		
-		////////////////	R Center
-		
-		
-		for(var s=1;s<=9;s++)
-		{
-			r[s]=ro[s];
-			b[s]=bo[s];
-			w[s]=wo[s];
-			g[s]=go[s];
-			o[s]=oo[s];
-			y[s]=yo[s];
-		}
-		
-		Rcenter();
-		solve();
-		
-		minimum = "XXX"+ minimum;
-		transform();
-		recompress();
+			recompress();
 
-		if(mini.length>minimum.length)
-		{
-			mini=minimum;
-			color=4;
-		}
-		
-		///////////////		G center
-		
-		for(var s=1;s<=9;s++)
-		{
-			r[s]=ro[s];
-			b[s]=bo[s];
-			w[s]=wo[s];
-			g[s]=go[s];
-			o[s]=oo[s];
-			y[s]=yo[s];
-		}
-		
-		Gcenter();
-		solve();
+			if(mini.length>minimum.length)
+			{
+				mini=minimum;
+				color=3;
+			}
+			
+			////////////////	R Center
+			
+			
+			for(var s=1;s<=9;s++)
+			{
+				r[s]=ro[s];
+				b[s]=bo[s];
+				w[s]=wo[s];
+				g[s]=go[s];
+				o[s]=oo[s];
+				y[s]=yo[s];
+			}
+			
+			Rcenter();
+			solve();
+			
+			minimum = "XXX"+ minimum;
+			transform();
+			recompress();
 
-		minimum = "Y"+ minimum;
-		transform();
-		recompress();
-		
-		if(mini.length>minimum.length)
-		{
-			mini=minimum;
-			color=5;
-		}
-		
-		///////////////		B center
-		
-		for(var s=1;s<=9;s++)
-		{
-			r[s]=ro[s];
-			b[s]=bo[s];
-			w[s]=wo[s];
-			g[s]=go[s];
-			o[s]=oo[s];
-			y[s]=yo[s];
-		}
-		
-		Bcenter();
-		solve();
+			if(mini.length>minimum.length)
+			{
+				mini=minimum;
+				color=4;
+			}
+			
+			///////////////		G center
+			
+			for(var s=1;s<=9;s++)
+			{
+				r[s]=ro[s];
+				b[s]=bo[s];
+				w[s]=wo[s];
+				g[s]=go[s];
+				o[s]=oo[s];
+				y[s]=yo[s];
+			}
+			
+			Gcenter();
+			solve();
 
-		minimum = "YYY"+ minimum;
-		transform();
-		recompress();
-		
-		if(mini.length>minimum.length)
-		{
-			mini=minimum;
-			color=6;
+			minimum = "Y"+ minimum;
+			transform();
+			recompress();
+			
+			if(mini.length>minimum.length)
+			{
+				mini=minimum;
+				color=5;
+			}
+			
+			///////////////		B center
+			
+			for(var s=1;s<=9;s++)
+			{
+				r[s]=ro[s];
+				b[s]=bo[s];
+				w[s]=wo[s];
+				g[s]=go[s];
+				o[s]=oo[s];
+				y[s]=yo[s];
+			}
+			
+			Bcenter();
+			solve();
+
+			minimum = "YYY"+ minimum;
+			transform();
+			recompress();
+			
+			if(mini.length>minimum.length)
+			{
+				mini=minimum;
+				color=6;
+			}
+			
+			////////////////////// END	
+			
+			minimum=mini;
+			
+			switch(color)
+			{
+				case 1:
+					col="WHITE";
+					break;
+				case 2:
+					col="ORANGE";
+					break;
+				case 3:
+					col="YELLOW";
+					break;
+				case 4:
+					col="RED";
+					break;
+				case 5:
+					col="GREEN";
+					break;
+				case 6:
+					col="BLUE";
+					break;	
+			}
 		}
-		
-		////////////////////// END	
-		
-		minimum=mini;
-		
-		switch(color)
+		else
 		{
-			case 1:
-				col="WHITE";
-				break;
-			case 2:
-				col="ORANGE";
-				break;
-			case 3:
-				col="YELLOW";
-				break;
-			case 4:
-				col="RED";
-				break;
-			case 5:
-				col="GREEN";
-				break;
-			case 6:
-				col="BLUE";
-				break;	
+			alert("Invalid configuration");
 		}
-	}
-	else
-	{
-		alert("Invalid Sudoku");
 	}
 }
 
