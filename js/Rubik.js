@@ -29,7 +29,7 @@ var mini = "";
 
 var Invalid = false;
 
-maxTime = 1000;
+maxTime = 800;
 
 while(minimum.length<200)
 	minimum=minimum+'a';
@@ -40,9 +40,7 @@ while(mini.length<200)
 var d = new Date();
 var startT = d.getTime();
 
-var Istore=100,Jstore=100;
-
-var color=0,numb=0,x=0;
+var color=0,x=0;
 var col="";
 var ix=[0,0,0,0,0],jx=[0,0,0,0,0];
 
@@ -95,13 +93,11 @@ var print = function()
 
 function setCharAt(str,index,chr)
 {
-    if(index > str.length-1) return str;
     return str.substr(0,index) + chr + str.substr(index+1);
 }
 
 var stringInput = function()
 {
-	var s="";
 	s = document.getElementById("textarea").value;
 	s=s.toUpperCase();
 
@@ -119,6 +115,10 @@ var stringInput = function()
 				y[i+1]=s[i+45];
 			}
 			paste();
+		}
+		else
+		{
+			alert("Invalid Input");
 		}
 	}
 	else
