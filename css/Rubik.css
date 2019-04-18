@@ -1,28 +1,33 @@
-body{
+body
+{
 	background-color: #e5e5e5;
 	margin: 0;
 }
 
-.div1{
+.div1
+{
 	width:30%;
 	height:100%;
 	position: fixed;
 	left: 0;
 }
 
-.Centered{
+.Centered
+{
 	display: block;
-    margin: auto auto;
+	margin: auto auto;
 }
 
-.div2{
+.div2
+{
 	width:34%;
 	height:100%;
 	position: fixed;
 	left:30%;
 }
 
-.div3{
+.div3
+{
 	width:39%;
 	height:100%;
 	position: fixed;
@@ -30,69 +35,63 @@ body{
 	padding-top: 30px;
 }
 
-#selectedColor{
+#selectedColor
+{
 	height: 48px;
-    width: 48px;
-    margin-left:48px;
-    cursor: not-allowed;
+	width: 48px;
+	margin-left:48px;
+	cursor: not-allowed;
 }
 
-#grid{
+#grid
+{
 	padding-top: 60px;
-    padding-bottom: 60px;
-    padding-left: 65px;
+	padding-bottom: 60px;
+	padding-left: 65px;
 	height: 576px;
 	width: 432px;
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    grid-template-rows: 1fr 1fr 1fr 1fr;
-    grid-row-gap: 10px;
-    grid-column-gap: 10px;
-    float: left;
+	display: grid;
+	grid-template-columns: 1fr 1fr 1fr;
+	grid-template-rows: 1fr 1fr 1fr 1fr;
+	grid-row-gap: 10px;
+	grid-column-gap: 10px;
+	float: left;
 }
 
-.button{
+.button
+{
 	background-color: #d2d2d2;
 	border-width:2;
 	cursor: pointer;
 }
 
-.button.R{
-	background-color: red;	
+.button.R{ background-color: red;}
+
+.button.W{ background-color: white;}
+
+.button.Y{ background-color: yellow;}
+
+.button.G{ background-color: #4fce06;}
+
+.button.B{ background-color: blue;}
+
+.button.O{ background-color: orange;}
+
+#selCol
+{
+	grid-row: 1;
+	grid-column: 1;
 }
 
-.button.W{
-	background-color: white;	
-}
-
-.button.Y{
-	background-color: yellow;	
-}
-
-.button.G{
-	background-color: #4fce06;	
-}
-
-.button.B{
-	background-color: blue;	
-}
-
-.button.O{
-	background-color: orange;	
-}
-
-#selCol{
-	grid-row: 1; 
-  	grid-column: 1;
-}
-
-#pickColor{
+#pickColor
+{
 	grid-row: 3/5;
 	grid-column: 1;
 	margin-left: -5px;
 }
 
-.pickButton{
+.pickButton
+{
 	font-family: Arial;
 	font-weight: 700;
 	font-size: 17px;
@@ -100,46 +99,27 @@ body{
 	cursor: grab;
 }
 
-#R{
-	background-color: red;
-	color: white;
-}
+#R{ background-color: red; color: white;}
 
-#W{
-	background-color: white;
-	color: black;
-}
+#W{ background-color: white; color: black;}
 
-#Y{
-	background-color: yellow;
-	color: black;
-}
+#Y{ background-color: yellow; color: black;}
 
-#G{
-	background-color: #4fce06;
-	color: white;
-}
+#G{ background-color: #4fce06; color: white;}
 
-#B{
-	background-color: blue;
-	color: white;
-}
+#B{ background-color: blue; color: white;}
 
-#O{
-	background-color: orange;
-	color: black;
-}
+#O{ background-color: orange; color: black;}
 
-#pickGrid{
+#pickGrid
+{
 	height: 144px;
 	width: 96px;
-
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr 1fr 1fr;
-
-    padding-left: 20px;
-    margin-top: -10px;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	grid-template-rows: 1fr 1fr 1fr;
+	padding-left: 20px;
+	margin-top: -10px;
 }
 
 #submit
@@ -150,7 +130,6 @@ body{
 	width: 96px;
 	background-color: #d2d2d2;
 	border-width:2;
-
 	margin-left: 20px;
 	margin-top: 9px;
 }
@@ -163,7 +142,6 @@ body{
 	width: 96px;
 	background-color: #d2d2d2;
 	border-width:2;
-
 	margin-left: 200px;
 	margin-top: 9px;
 }
@@ -180,28 +158,31 @@ body{
 	margin-top: 9px;
 }
 
-.red{
-	grid-row: 1; 
-  	grid-column: 2;
-    height: 144px;
-    width: 144px;
-    display: grid;
+.red
+{
+	grid-row: 1;
+	grid-column: 2;
+	height: 144px;
+	width: 144px;
+	display: grid;
 	grid-template-columns: 1fr 1fr 1fr;
-    grid-template-rows: 1fr 1fr 1fr;
+	grid-template-rows: 1fr 1fr 1fr;
 }
 
-.blue{
+.blue
+{
+	grid-row: 2;
+	grid-column: 1;
+	height: 144px;
+	width: 144px;
+	display: grid;
+	grid-template-columns: 1fr 1fr 1fr;
+	grid-template-rows: 1fr 1fr 1fr;
+}
+
+.white
+{
 	grid-row: 2; 
-  	grid-column: 1;
-    height: 144px;
-    width: 144px;
-    display: grid;
-	grid-template-columns: 1fr 1fr 1fr;
-    grid-template-rows: 1fr 1fr 1fr;
-}
-
-.white{
-	grid-row: 2; 
   	grid-column: 2;
     height: 144px;
     width: 144px;
@@ -210,38 +191,42 @@ body{
     grid-template-rows: 1fr 1fr 1fr;
 }
 
-.green{
-	grid-row: 2; 
-  	grid-column: 3;
-    height: 144px;
-    width: 144px;
-    display: grid;
+.green
+{
+	grid-row: 2;
+	grid-column: 3;
+	height: 144px;
+	width: 144px;
+	display: grid;
 	grid-template-columns: 1fr 1fr 1fr;
-    grid-template-rows: 1fr 1fr 1fr;
+	grid-template-rows: 1fr 1fr 1fr;
 }
 
-.orange{
-	grid-row: 3; 
-  	grid-column: 2;
-    height: 144px;
-    width: 144px;
-    display: grid;
+.orange
+{
+	grid-row: 3;
+	grid-column: 2;
+	height: 144px;
+	width: 144px;
+	display: grid;
 	grid-template-columns: 1fr 1fr 1fr;
-    grid-template-rows: 1fr 1fr 1fr;
+	grid-template-rows: 1fr 1fr 1fr;
 }
 
-.yellow{
-	grid-row: 4; 
-  	grid-column: 2;
-    height: 144px;
-    width: 144px;
-    display: grid;
+.yellow
+{
+	grid-row: 4;
+	grid-column: 2;
+	height: 144px;
+	width: 144px;
+	display: grid;
 	grid-template-columns: 1fr 1fr 1fr;
-    grid-template-rows: 1fr 1fr 1fr;
+	grid-template-rows: 1fr 1fr 1fr;
 }
 
 
-#textBox{
+#textBox
+{
 	background-color: white;
 	resize: both;
 	overflow: auto;
@@ -249,10 +234,10 @@ body{
 	width:60%;
 	height: 52%;
 	margin: auto;
-
 }
 
-#text{
+#text
+{
 	width: 100%;
 	height: 100%;
 	font-size: 20px;
@@ -260,80 +245,62 @@ body{
 	font-family: Arial;
 }
 
-#switchButton{
-    padding-left: 60px;
-}
+#switchButton{ padding-left: 60px;}
 
-#leftImage{
+#leftImage
+{
 	padding-top: 60px;
-    padding-bottom: 10px;
-    padding-left: 45px;
+	padding-bottom: 10px;
+	padding-left: 45px;
 }
 
-#rightImage{
+#rightImage
+{
 	padding-top: 32px;
-    padding-right: 100px;
-    padding-bottom: 30px;
-    padding-left: 25px;
+	padding-right: 100px;
+	padding-bottom: 30px;
+	padding-left: 25px;
 }
 
-#r5{
-	background-color: red;
-	cursor: not-allowed;
+#r5{ background-color: red; cursor: not-allowed;}
+
+#b5{ background-color: blue; cursor: not-allowed;}
+
+#w5{ background-color: white; cursor: not-allowed;}
+
+#g5{ background-color: #4fce06; cursor: not-allowed;}
+
+#o5{ background-color: orange; cursor: not-allowed;}
+
+#y5{ background-color: yellow; cursor: not-allowed;}
+
+.help-tip
+{
+	margin-left: 295px;
+	margin-top: -42px;
+	background-color: #1368f2;
+	border-radius: 50%;
+	width: 16px;
+	height: 16px;
+	font-size: 19px;
+	line-height: 26px;
+	cursor: help;
+	padding-bottom: 8px;
+	padding-left: 7px;
+	font-weight: bold;
+	color:#fff;
 }
 
-#b5{
-	background-color: blue;
-	cursor: not-allowed;
-}
+.gitlink{ position:relative;}
 
-#w5{
-	background-color: white;
-	cursor: not-allowed;
-}
-
-#g5{
-	background-color: #4fce06;
-	cursor: not-allowed;
-}
-
-#o5{
-	background-color: orange;
-	cursor: not-allowed;
-}
-
-#y5{
-	background-color: yellow;
-	cursor: not-allowed;
-}
-
-.help-tip{
-    margin-left: 295px;
-    margin-top: -42px;
-    background-color: #1368f2;
-    border-radius: 50%;
-    width: 16px;
-    height: 16px;
-    font-size: 19px;
-    line-height: 26px;
-    cursor: help;
-    padding-bottom: 8px;
-    padding-left: 7px;
-    font-weight: bold;
-    color:#fff;
-}
-
-.gitlink{
-	position:relative;
-}
-
-#gitlink{
+#gitlink
+{
 	position: absolute;
-    bottom: -160px;
-    left: 10px;
-    text-align: center;
-    font-size: 25px;
-    font-family: Arial;
-    font-weight: bold;
-    color: black;
+	bottom: -160px;
+	left: 10px;
+	text-align: center;
+	font-size: 25px;
+	font-family: Arial;
+	font-weight: bold;
+	color: black;
 }
