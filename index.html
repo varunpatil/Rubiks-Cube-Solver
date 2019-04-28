@@ -9,16 +9,27 @@
 	<div class="div1">
 		<div class="div1Content">
 			<div id="leftImage">
-				<img class="Centered" src="images/Orientation.png">
+				<img class="Centered" src="images/Orientation.png" title="Orientation" alt="Orientation">
 			</div>
 			<p><span style="font-weight: 700; font-family: Arial; font-size: 16px; margin-left:200px;">String Input</span></p>
 
-			<div class="help-tip">
+			<div id="help-tip">
     			<p onclick="help()">?</p>
 			</div>
 
 			<textarea id="textarea" spellcheck="false" cols="54" rows="2" style="font-weight: 700; font-family: Arial; font-size: 14px; margin-left:28px; margin-top: 10px;"></textarea>
 			<button id="enter" onclick="stringInput()">Enter</button>
+
+			<h1 style="margin-left: 30px; margin-top: 30px; font-size:25px; font-family: Arial;">Reverse Solution</h1>
+
+			<label class="switch">
+			  <input type="checkbox" id="checkbox">
+			  <span class="slider" onclick="Rev()"></span>
+			</label>
+
+			<div id="help-tip2">
+    			<p onclick="help2()">?</p>
+			</div>
 
 			<div class="gitlink">
 				<p id="gitlink"><a href="https://github.com/varun271099/Rubiks-Cube-Solver/tree/gh-pages" target="_blank" title="Github Code">Github</a></p>
@@ -46,6 +57,11 @@
 				</div>
 				<button id="submit" onclick="submit()">Submit</button>
 				<button id="clearAll" onclick="clearAll()">Clear All</button>
+			</div>
+
+			<div id="others">
+				<button id="Scramble" onclick="Scramble()">Scramble</button>
+				<button id="SolvedState" onclick="SolvedState()">Solved State</button>
 			</div>
 
 			<div class="red">
@@ -127,7 +143,22 @@
 			<p id="text"></p>
 		</div>
 		<div id="rightImage">
-			<img width="500px;" class="Centered" src="images/Moves.png">	
+			<img width="500px" class="Centered"src="images/Moves.png" title="Moves" alt="Moves" usemap="#clicker" unselectable="on">
+			<map name="clicker">
+			    <area shape="rect" coords="0,0,67,115"    title="R" id="MR" onclick="Mclick(this.id)">
+				<area shape="rect" coords="77,0,144,115"  title="r" id="Mr" onclick="Mclick(this.id)">
+			    <area shape="rect" coords="174,0,245,115" title="L" id="ML" onclick="Mclick(this.id)">
+			    <area shape="rect" coords="253,0,322,115" title="l" id="Ml" onclick="Mclick(this.id)">
+			    <area shape="rect" coords="350,0,421,115" title="B" id="MB" onclick="Mclick(this.id)">
+			    <area shape="rect" coords="431,0,498,115" title="b" id="Mb" onclick="Mclick(this.id)">
+
+			    <area shape="rect" coords="0,132,67,260"    title="D" id="MD" onclick="Mclick(this.id)">
+			    <area shape="rect" coords="77,132,144,260"  title="d" id="Md" onclick="Mclick(this.id)">
+			    <area shape="rect" coords="174,132,245,260" title="F" id="MF" onclick="Mclick(this.id)">
+			    <area shape="rect" coords="253,132,322,260" title="f" id="Mf" onclick="Mclick(this.id)">
+			    <area shape="rect" coords="350,132,421,260" title="U" id="MU" onclick="Mclick(this.id)">
+			    <area shape="rect" coords="431,132,498,260" title="u" id="Mu" onclick="Mclick(this.id)">
+			</map>
 		</div>	
 	</div>
 

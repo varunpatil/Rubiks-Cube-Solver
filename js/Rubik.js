@@ -28,6 +28,7 @@ var minimum = "";
 var mini = "";
 
 var Invalid = false;
+var rev = false;
 
 maxTime = 800;
 
@@ -129,6 +130,9 @@ var stringInput = function()
 
 var printSoln = function()
 {
+	if(rev == true)
+		reverse();
+
 	recompress();
 	str="";
 	for(var i=0;i<minimum.length;i++)
@@ -143,6 +147,40 @@ var printSoln = function()
 
 	if(minimum.length>0)
 	document.getElementById("text").innerText=str;
+}
+
+var reverse = function()
+{
+	var temp = "";
+	for(var i=minimum.length-1;i>=0;i--)
+	{
+		if(minimum[i]>'a')
+			temp = temp + minimum[i].toUpperCase();
+		else
+			temp = temp + minimum[i].toLowerCase();
+	}
+	minimum = temp;
+}
+
+var Rev = function()
+{
+	if(document.getElementById("checkbox").checked==true)
+	{
+		rev=false;
+		if(document.getElementById("text").innerText!="")
+		{
+			reverse();
+			printSoln();
+		}
+	}
+	else
+	{
+		rev=true;
+		if(document.getElementById("text").innerText!="")
+		{
+			printSoln();
+		}
+	}
 }
 
 var submit = function()
@@ -194,6 +232,96 @@ var paste = function()
 	}
 }
 
+var Mclick = function(click_id)
+{
+	if(click_id[1]=='R'){ R(); paste(); }
+	else if(click_id[1]=='r'){ Rs(); paste(); }
+	else if(click_id[1]=='L'){ L();  paste(); }
+	else if(click_id[1]=='l'){ Ls(); paste(); }
+	else if(click_id[1]=='B'){ B();  paste(); }
+	else if(click_id[1]=='b'){ Bs(); paste(); }
+	else if(click_id[1]=='D'){ D();  paste(); }
+	else if(click_id[1]=='d'){ Ds(); paste(); }
+	else if(click_id[1]=='F'){ F();  paste(); }
+	else if(click_id[1]=='f'){ Fs(); paste(); }
+	else if(click_id[1]=='U'){ U();  paste(); }
+	else if(click_id[1]=='u'){ Us(); paste(); }
+}
+
+var Scramble = function()
+{
+	document.getElementById("text").innerText="";
+	for(var i=1;i<=9;i++)
+	{
+		r[i]='R';
+		b[i]='B';
+		w[i]='W';
+		g[i]='G';
+		o[i]='O';
+		y[i]='Y';
+	}
+
+	for(var i=0;i<100;i++)
+	{
+		var num = Math.floor(Math.random() * 12);
+		switch(num)
+		{
+			case 0:
+				B();
+				break;
+			case 1:
+				U();
+				break;
+			case 2:
+				F();
+				break;
+			case 3:
+				D();
+				break;
+			case 4:
+				R();
+				break;
+			case 5:
+				L();
+				break;
+			case 6:
+				Rs();
+				break;
+			case 7:
+				Ls();
+				break;
+			case 8:
+				Fs();
+				break;
+			case 9:
+				Us();
+				break;
+			case 10:
+				Bs();
+				break;
+			case 11:
+				Ds();
+				break;
+		}
+	}
+	paste();
+}
+
+var SolvedState = function()
+{
+	document.getElementById("text").innerText="";
+	for(var i=1;i<=9;i++)
+	{
+		r[i]='R';
+		b[i]='B';
+		w[i]='W';
+		g[i]='G';
+		o[i]='O';
+		y[i]='Y';
+	}
+	paste();
+}
+
 var help = function()
 {
 	var s="   ",S="                      ";
@@ -219,6 +347,11 @@ var help = function()
 	A=A+"NOW ENTER THE THE FACE VALUE ( R / B / W / G / O / Y) ONLY\n\n";
 	A=A+"ENTER STARTING FROM R1 TO R9 THEN B1 TO B9 THEN W1 TO W9 THEN G1 TO G9 THEN O1 TO O9 THEN Y1 TO Y9 RESPECTIVELY";
 	alert(A);
+}
+
+var help2 = function()
+{
+	alert("When ON, the solution will be the set of moves that will transform a Solved Cube into the Input State");
 }
 
 ///////////////////////////////////////////////////////////////////////////
