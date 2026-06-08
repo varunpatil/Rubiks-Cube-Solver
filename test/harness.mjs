@@ -10,11 +10,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { NAMED_SCRAMBLES, runSet, diff, COMPARE_KEYS } from './lib.mjs';
+import { NAMED_SCRAMBLES, runSet, diff, COMPARE_KEYS, SOLVER } from './lib.mjs';
 
 const GOLDEN = path.join(path.dirname(fileURLToPath(import.meta.url)), 'golden.json');
-const [target, mode] = process.argv.slice(2);
-if (!target) { console.error('usage: node test/harness.mjs <target> [--golden|--check]'); process.exit(2); }
+// `node test/harness.mjs --check` uses the split SOLVER module set by default;
+// pass an explicit target to check a different build.
+const args = process.argv.slice(2);
+const [target, mode] = args[0] && args[0].startsWith('--') ? [SOLVER, args[0]] : args;
+if (!target) { console.error('usage: node test/harness.mjs [<target>] [--golden|--check]'); process.exit(2); }
 
 // Only --golden needs the (expensive) independent re-solve verification.
 const results = runSet(target, NAMED_SCRAMBLES, mode === '--golden');

@@ -10,6 +10,10 @@ import vm from 'node:vm';
 import fs from 'node:fs';
 import path from 'node:path';
 
+// The solver, split across modules, loaded in dependency order (the page loads
+// these same files in the same order). Pass as a single comma-joined target.
+export const SOLVER = 'js/cube.js,js/predicates.js,js/tables.js,js/solver.js,js/ui.js';
+
 // The 12 quarter/prime turns, mapped to the global function names the cube exposes.
 export const MOVE_FNS = ['R', 'Rs', 'L', 'Ls', 'U', 'Us', 'D', 'Ds', 'F', 'Fs', 'B', 'Bs'];
 
@@ -75,6 +79,9 @@ function makeSandbox() {
     document: { getElementById: getEl },
     alert: (msg) => alerts.push(String(msg)),
     Date: FrozenDate,
+    // The UI's notify() uses these; harness never hits that path for valid cubes,
+    // but provide them so it can't throw if it ever does.
+    setTimeout: () => 0, clearTimeout: () => {},
     Math, parseInt, parseFloat, String, Number, Array, isNaN, console,
   };
   sandbox.__elements = elements;

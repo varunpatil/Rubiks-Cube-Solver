@@ -7,7 +7,12 @@
 	<title>Rubik's Cube Solver</title>
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="stylesheet" type="text/css" href="css/Rubik.css">
-	<script type="text/javascript" src="js/Rubik.js"></script>
+	<!-- Solver, split into modules, loaded in dependency order -->
+	<script src="js/cube.js"></script>
+	<script src="js/predicates.js"></script>
+	<script src="js/tables.js"></script>
+	<script src="js/solver.js"></script>
+	<script src="js/ui.js"></script>
 </head>
 <body>
 
@@ -224,16 +229,25 @@
 					<p class="card-sub">White front · Red top · Green right · Blue left.</p>
 				</div>
 				<div class="orient-wrap">
-					<img src="images/Orientation.png" alt="Hold the cube with white facing you, red on top, green on the right, blue on the left." loading="lazy">
+					<img class="orient-cube" src="images/orientation.svg" width="200" height="224"
+						alt="Isometric cube: red on top, white facing front, green on the right.">
 				</div>
-				<details class="moves-legend">
-					<summary>Show move legend image</summary>
-					<img src="images/Moves.png" alt="Reference diagram of the 12 cube moves R r L l B b D d F f U u." loading="lazy">
-				</details>
 			</section>
 
 		</div>
 	</main>
+
+	<!-- Toast for transient messages (replaces alert) -->
+	<div id="toast" class="toast" role="status" aria-live="polite"><span id="toast-msg"></span></div>
+
+	<!-- Modal dialog for instructions / explanations -->
+	<div id="modal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+		<div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+			<button class="modal-close" type="button" onclick="closeModal()" aria-label="Close">&times;</button>
+			<h2 id="modal-title"></h2>
+			<div id="modal-body"></div>
+		</div>
+	</div>
 
 </body>
 </html>
