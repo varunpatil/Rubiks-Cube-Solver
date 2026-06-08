@@ -1,3754 +1,1122 @@
-var 
-r=['0','0','0','0','0','R','0','0','0','0'],
-w=['0','0','0','0','0','W','0','0','0','0'],
-o=['0','0','0','0','0','O','0','0','0','0'],
-y=['0','0','0','0','0','Y','0','0','0','0'],
-b=['0','0','0','0','0','B','0','0','0','0'],
-g=['0','0','0','0','0','G','0','0','0','0'],
+/* =============================================================================
+ * Rubik's Cube Solver
+ *
+ * Solving method (unchanged from the original): a beginner's / F2L method, brute
+ * forced for the shortest move sequence. For every one of the 6 ways to orient
+ * the cube (each colour as the starting cross), solve() tries all 24x24 orderings
+ * of edge / second-layer insertions and keeps the shortest result; All_Face_solve
+ * keeps the shortest across the 6 orientations.
+ *
+ * Cube model
+ * ----------
+ * Six faces, each a 3x3 grid stored 1..9 (index 0 unused, index 5 is the fixed
+ * centre). Face arrays are named by colour: r=red w=white o=orange y=yellow
+ * b=blue g=green. Each cell holds a colour letter ('R','W','O','Y','B','G') or
+ * '0' while unset. Hold the cube white-front, red-up, green-right; sticker
+ * numbering matches the on-screen net (see help()).
+ *
+ * Moves
+ * -----
+ * F B R L U D turn a face clockwise; each mutates the face arrays and appends its
+ * letter to `original` (the running move log). Primed turns Fs Bs Rs Ls Us Ds are
+ * the same turn three times. X and Y are whole-cube rotations used to re-orient.
+ * A solution is a string of move letters (uppercase = clockwise, lowercase =
+ * prime); compress()/recompress() cancel redundant turns.
+ * ========================================================================== */
 
-ro=['0','0','0','0','0','R','0','0','0','0'],
-wo=['0','0','0','0','0','W','0','0','0','0'],
-oo=['0','0','0','0','0','O','0','0','0','0'],
-yo=['0','0','0','0','0','Y','0','0','0','0'],
-bo=['0','0','0','0','0','B','0','0','0','0'],
-go=['0','0','0','0','0','G','0','0','0','0'],
+'use strict';
 
-rx=['0','0','0','0','0','R','0','0','0','0'],
-wx=['0','0','0','0','0','W','0','0','0','0'],
-ox=['0','0','0','0','0','O','0','0','0','0'],
-yx=['0','0','0','0','0','Y','0','0','0','0'],
-bx=['0','0','0','0','0','B','0','0','0','0'],
-gx=['0','0','0','0','0','G','0','0','0','0'];
+// ---- Cube state -------------------------------------------------------------
+// Working faces, plus two backups: *o snapshots the user's input (restored on a
+// failed/timed-out solve), *x snapshots the per-orientation start inside solve().
+const r = ['0', '0', '0', '0', '0', 'R', '0', '0', '0', '0'];
+const w = ['0', '0', '0', '0', '0', 'W', '0', '0', '0', '0'];
+const o = ['0', '0', '0', '0', '0', 'O', '0', '0', '0', '0'];
+const y = ['0', '0', '0', '0', '0', 'Y', '0', '0', '0', '0'];
+const b = ['0', '0', '0', '0', '0', 'B', '0', '0', '0', '0'];
+const g = ['0', '0', '0', '0', '0', 'G', '0', '0', '0', '0'];
 
-var selected_color = "0";
+const ro = ['0', '0', '0', '0', '0', 'R', '0', '0', '0', '0'];
+const wo = ['0', '0', '0', '0', '0', 'W', '0', '0', '0', '0'];
+const oo = ['0', '0', '0', '0', '0', 'O', '0', '0', '0', '0'];
+const yo = ['0', '0', '0', '0', '0', 'Y', '0', '0', '0', '0'];
+const bo = ['0', '0', '0', '0', '0', 'B', '0', '0', '0', '0'];
+const go = ['0', '0', '0', '0', '0', 'G', '0', '0', '0', '0'];
 
-var original = "";
-var final = "";
-var minimum = "";
-var mini = "";
+const rx = ['0', '0', '0', '0', '0', 'R', '0', '0', '0', '0'];
+const wx = ['0', '0', '0', '0', '0', 'W', '0', '0', '0', '0'];
+const ox = ['0', '0', '0', '0', '0', 'O', '0', '0', '0', '0'];
+const yx = ['0', '0', '0', '0', '0', 'Y', '0', '0', '0', '0'];
+const bx = ['0', '0', '0', '0', '0', 'B', '0', '0', '0', '0'];
+const gx = ['0', '0', '0', '0', '0', 'G', '0', '0', '0', '0'];
 
-var Invalid = false;
-var rev = false;
+// Faces grouped for whole-state copies. Index order is arbitrary but consistent.
+const WORK = [r, w, o, y, b, g];
+const INPUT_BACKUP = [ro, wo, oo, yo, bo, go];
+const SOLVE_BACKUP = [rx, wx, ox, yx, bx, gx];
 
-maxTime = 800;
+// Face lookup by letter, for the data-driven step solvers and the UI.
+const FACES = { r: r, w: w, o: o, y: y, b: b, g: g };
 
-while(minimum.length<200)
-	minimum=minimum+'a';
-
-while(mini.length<200)
-	mini=mini+'a';
-
-var d = new Date();
-var startT = d.getTime();
-
-var color=0,x=0;
-var col="";
-var ix=[0,0,0,0,0],jx=[0,0,0,0,0];
-
-var buttonClick = function(click_id)
-{
-	if(selected_color!="0")
-	{
-		document.getElementById(click_id).className="button"+" "+selected_color;
-
-		if(click_id[0]=='R')
-			r[parseInt(click_id[1])]=selected_color;
-		else if(click_id[0]=='W')
-			w[parseInt(click_id[1])]=selected_color;
-		else if(click_id[0]=='O')
-			o[parseInt(click_id[1])]=selected_color;
-		else if(click_id[0]=='Y')
-			y[parseInt(click_id[1])]=selected_color;
-		else if(click_id[0]=='B')
-			b[parseInt(click_id[1])]=selected_color;
-		else if(click_id[0]=='G')
-			g[parseInt(click_id[1])]=selected_color;
-	}
+// Copy every sticker (1..9) of each face from src faces into dst faces.
+function copyState(dst, src) {
+  for (let f = 0; f < 6; f++) for (let i = 1; i <= 9; i++) dst[f][i] = src[f][i];
 }
 
-var pickColor = function(click_id)
-{
-	selected_color = click_id;
-	document.getElementById("selectedColor").className="button"+" "+click_id;
+// ---- Solver bookkeeping ------------------------------------------------------
+const SOLUTION_CAP = 200; // unreachable upper bound on solution length; used as a sentinel
+const maxTime = 800;      // ms budget; a longer search means an invalid configuration
+
+// These three are declared with `var` on purpose: the page and the test harness
+// read them off the global object by name, which only `var`/function do.
+var minimum = 'a'.repeat(SOLUTION_CAP); // best (shortest) solution found so far
+var col = '';        // name of the winning starting-cross colour
+var Invalid = false; // set when the input cannot be solved
+
+// Internal solver bookkeeping.
+let selected_color = '0';
+let original = '';   // raw move log appended to by every turn
+let final = '';      // compress() output
+let mini = 'a'.repeat(SOLUTION_CAP); // best across orientations, in All_Face_solve
+let rev = false;     // "reverse solution" toggle
+let color = 0;
+let startT = new Date().getTime();
+
+// ---- Turns ------------------------------------------------------------------
+// Each turn cycles the affected stickers (4-cycles via a temp) and logs itself.
+function F() {
+  original += 'F';
+  let t = w[8]; w[8] = w[6]; w[6] = w[2]; w[2] = w[4]; w[4] = t;
+  t = w[7]; w[7] = w[9]; w[9] = w[3]; w[3] = w[1]; w[1] = t;
+  t = o[3]; o[3] = g[1]; g[1] = r[1]; r[1] = b[3]; b[3] = t;
+  t = o[2]; o[2] = g[2]; g[2] = r[2]; r[2] = b[2]; b[2] = t;
+  t = o[1]; o[1] = g[3]; g[3] = r[3]; r[3] = b[1]; b[1] = t;
+}
+function B() {
+  original += 'B';
+  let t = y[7]; y[7] = y[9]; y[9] = y[3]; y[3] = y[1]; y[1] = t;
+  t = y[4]; y[4] = y[8]; y[8] = y[6]; y[6] = y[2]; y[2] = t;
+  t = r[9]; r[9] = g[9]; g[9] = o[7]; o[7] = b[7]; b[7] = t;
+  t = r[8]; r[8] = g[8]; g[8] = o[8]; o[8] = b[8]; b[8] = t;
+  t = r[7]; r[7] = g[7]; g[7] = o[9]; o[9] = b[9]; b[9] = t;
+}
+function R() {
+  original += 'R';
+  let t = w[3]; w[3] = o[3]; o[3] = y[3]; y[3] = r[9]; r[9] = t;
+  t = w[6]; w[6] = o[6]; o[6] = y[6]; y[6] = r[6]; r[6] = t;
+  t = w[9]; w[9] = o[9]; o[9] = y[9]; y[9] = r[3]; r[3] = t;
+  t = g[3]; g[3] = g[9]; g[9] = g[7]; g[7] = g[1]; g[1] = t;
+  t = g[2]; g[2] = g[6]; g[6] = g[8]; g[8] = g[4]; g[4] = t;
+}
+function L() {
+  original += 'L';
+  let t = r[7]; r[7] = y[1]; y[1] = o[1]; o[1] = w[1]; w[1] = t;
+  t = r[4]; r[4] = y[4]; y[4] = o[4]; o[4] = w[4]; w[4] = t;
+  t = r[1]; r[1] = y[7]; y[7] = o[7]; o[7] = w[7]; w[7] = t;
+  t = b[7]; b[7] = b[9]; b[9] = b[3]; b[3] = b[1]; b[1] = t;
+  t = b[8]; b[8] = b[6]; b[6] = b[2]; b[2] = b[4]; b[4] = t;
+}
+function U() {
+  original += 'U';
+  let t = g[1]; g[1] = y[9]; y[9] = b[7]; b[7] = w[1]; w[1] = t;
+  t = g[4]; g[4] = y[8]; y[8] = b[4]; b[4] = w[2]; w[2] = t;
+  t = g[7]; g[7] = y[7]; y[7] = b[1]; b[1] = w[3]; w[3] = t;
+  t = r[1]; r[1] = r[3]; r[3] = r[9]; r[9] = r[7]; r[7] = t;
+  t = r[6]; r[6] = r[8]; r[8] = r[4]; r[4] = r[2]; r[2] = t;
+}
+function D() {
+  original += 'D';
+  let t = b[9]; b[9] = y[3]; y[3] = g[3]; g[3] = w[7]; w[7] = t;
+  t = b[6]; b[6] = y[2]; y[2] = g[6]; g[6] = w[8]; w[8] = t;
+  t = b[3]; b[3] = y[1]; y[1] = g[9]; g[9] = w[9]; w[9] = t;
+  t = o[7]; o[7] = o[9]; o[9] = o[3]; o[3] = o[1]; o[1] = t;
+  t = o[4]; o[4] = o[8]; o[8] = o[6]; o[6] = o[2]; o[2] = t;
 }
 
-var print = function()
-{
-	s="";
-	for(var i=1;i<=9;i++)
-		s+=r[i];
-	for(var i=1;i<=9;i++)
-		s+=b[i];
-	for(var i=1;i<=9;i++)
-		s+=w[i];
-	for(var i=1;i<=9;i++)
-		s+=g[i];
-	for(var i=1;i<=9;i++)
-		s+=o[i];
-	for(var i=1;i<=9;i++)
-		s+=y[i];
+// Primed (counter-clockwise) turns = the clockwise turn three times.
+function Fs() { F(); F(); F(); }
+function Bs() { B(); B(); B(); }
+function Rs() { R(); R(); R(); }
+function Ls() { L(); L(); L(); }
+function Us() { U(); U(); U(); }
+function Ds() { D(); D(); D(); }
 
-	if(s.search("0")==-1)
-	document.getElementById("textarea").value=s;
+// Whole-cube rotations (used to re-orient before solving from another colour).
+function X() {
+  R(); Ls();
+  let t = o[5]; o[5] = y[5]; y[5] = r[5]; r[5] = w[5]; w[5] = t;
+  t = o[2]; o[2] = y[2]; y[2] = r[8]; r[8] = w[2]; w[2] = t;
+  t = o[8]; o[8] = y[8]; y[8] = r[2]; r[2] = w[8]; w[8] = t;
+}
+function Y() {
+  U(); Ds();
+  let t = g[5]; g[5] = y[5]; y[5] = b[5]; b[5] = w[5]; w[5] = t;
+  t = g[2]; g[2] = y[6]; y[6] = b[8]; b[8] = w[4]; w[4] = t;
+  t = g[8]; g[8] = y[4]; y[4] = b[2]; b[2] = w[6]; w[6] = t;
 }
 
-function setCharAt(str,index,chr)
-{
-    return str.substr(0,index) + chr + str.substr(index+1);
+// ---- Move-sequence compression ---------------------------------------------
+// compress(): scan `original`; 3 identical turns in a row collapse to one prime
+// (lowercase), 4 collapse to nothing. recompress(): expand primes back to triples
+// and compress() repeatedly until the length stops shrinking.
+function compress() {
+  final = '';
+  for (let i = 0; i < original.length; i++) {
+    if (i + 2 < original.length && original[i] === original[i + 1] && original[i] === original[i + 2]) {
+      if (original[i] !== original[i + 3]) { final += original[i].toLowerCase(); i += 2; }
+      else { i += 3; }
+    } else {
+      final += original[i];
+    }
+  }
+}
+function recompress() {
+  let prev = '';
+  while (prev !== minimum) {
+    prev = minimum;
+    original = '';
+    final = '';
+    for (let i = 0; i < minimum.length; i++) {
+      const c = minimum[i];
+      original += c > 'a' ? c.toUpperCase().repeat(3) : c;
+    }
+    compress();
+    minimum = final;
+  }
 }
 
-var stringInput = function()
-{
-	s = document.getElementById("textarea").value;
-	s=s.toUpperCase();
-
-	if(s.length==54 && s.replace(/R/g,"").length==45 && s.replace(/B/g,"").length==45 && s.replace(/W/g,"").length==45 && s.replace(/G/g,"").length==45 && s.replace(/O/g,"").length==45 && s.replace(/Y/g,"").length==45 )
-	{
-		if(s[4]=='R' && s[13]=='B' && s[22]=='W' && s[31]=='G' && s[40]=='O' && s[49]=='Y')
-		{
-			for(var i=0;i<9;i++)
-			{
-				r[i+1]=s[i];
-				b[i+1]=s[i+9];
-				w[i+1]=s[i+18];
-				g[i+1]=s[i+27];
-				o[i+1]=s[i+36];
-				y[i+1]=s[i+45];
-			}
-			paste();
-		}
-		else
-		{
-			alert("Invalid Input");
-		}
-	}
-	else
-	{
-		alert("Invalid Input");
-	}
+// transform(): resolve whole-cube rotations recorded in `minimum`. Walking from
+// the end, every X (or Y) relabels all following face turns as if the cube had
+// been rotated, then the X/Y markers are stripped.
+function transform() {
+  const X_MAP = { U: 'F', D: 'B', F: 'D', B: 'U', u: 'f', d: 'b', f: 'd', b: 'u' };
+  const Y_MAP = { R: 'B', L: 'F', F: 'R', B: 'L', r: 'b', l: 'f', f: 'r', b: 'l' };
+  const ch = minimum.split('');
+  for (let i = ch.length - 1; i >= 0; i--) {
+    const map = ch[i] === 'X' ? X_MAP : ch[i] === 'Y' ? Y_MAP : null;
+    if (!map) continue;
+    for (let j = i + 1; j < ch.length; j++) if (map[ch[j]]) ch[j] = map[ch[j]];
+  }
+  minimum = ch.filter((c) => c !== 'X' && c !== 'Y').join('');
+  if (minimum.length < 90) recompress();
 }
 
-var printSoln = function()
-{
-	if(rev == true)
-		reverse();
-
-	recompress();
-	str="";
-	for(var i=0;i<minimum.length;i++)
-	{
-		if(i%4==0 && i!=0)
-		{
-			str = str + "\n";
-		}
-		str = str + minimum[i] + " ";
-	}
-	str = str + "\nNo of Moves = "+String(minimum.length) + "\n" + col;
-
-	if(minimum.length>0)
-	document.getElementById("text").innerText=str;
+// The n-th permutation of {0,1,2,3} (factorial-base / Lehmer code), as a 4-element
+// array. solve() uses it to pick the order in which to insert the 4 cross edges /
+// 4 second-layer pairs, sweeping n = 0..23 to try every ordering.
+function permutation(n) {
+  const digits = [0, 0, 0, 0];
+  const used = [0, 0, 0, 0];
+  let i = 1;
+  while (n > 0) { i++; digits[i - 1] = n % i; n = n / i; }
+  const perm = [];
+  for (i = 3; i >= 0; i--) {
+    let k = digits[i];
+    let j = 0;
+    while (k >= 0) { if (used[j] === 0) { k--; j++; } else { j++; } }
+    j--;
+    perm.push(j);
+    used[j] = 1;
+  }
+  return perm;
 }
 
-var reverse = function()
-{
-	var temp = "";
-	for(var i=minimum.length-1;i>=0;i--)
-	{
-		if(minimum[i]>'a')
-			temp = temp + minimum[i].toUpperCase();
-		else
-			temp = temp + minimum[i].toLowerCase();
-	}
-	minimum = temp;
+// ---- Predicates -------------------------------------------------------------
+// F2L slot solved? (white + the two side colours of a corner/edge pair in place)
+function f2l_rb() { return w[1] === 'W' && r[1] === 'R' && r[4] === 'R' && b[1] === 'B' && b[4] === 'B' ? 1 : 0; }
+function f2l_rg() { return w[3] === 'W' && r[3] === 'R' && r[6] === 'R' && g[1] === 'G' && g[4] === 'G' ? 1 : 0; }
+function f2l_bo() { return w[7] === 'W' && o[1] === 'O' && o[4] === 'O' && b[3] === 'B' && b[6] === 'B' ? 1 : 0; }
+function f2l_go() { return w[9] === 'W' && g[3] === 'G' && g[6] === 'G' && o[3] === 'O' && o[6] === 'O' ? 1 : 0; }
+
+// Last-layer corner present in its slot (any orientation)?
+function rby() { return ('' + r[7] + b[7] + y[7]).includes('R') && ('' + r[7] + b[7] + y[7]).includes('B') && ('' + r[7] + b[7] + y[7]).includes('Y') ? 1 : 0; }
+function rgy() { return ('' + r[9] + g[7] + y[9]).includes('R') && ('' + r[9] + g[7] + y[9]).includes('G') && ('' + r[9] + g[7] + y[9]).includes('Y') ? 1 : 0; }
+function ogy() { return ('' + o[9] + g[9] + y[3]).includes('O') && ('' + o[9] + g[9] + y[3]).includes('G') && ('' + o[9] + g[9] + y[3]).includes('Y') ? 1 : 0; }
+function oby() { return ('' + o[7] + b[9] + y[1]).includes('O') && ('' + o[7] + b[9] + y[1]).includes('B') && ('' + o[7] + b[9] + y[1]).includes('Y') ? 1 : 0; }
+
+// Stage-completion checks, each building on the previous.
+function check_white_cross() {
+  return w[2] === 'W' && w[4] === 'W' && w[6] === 'W' && w[8] === 'W' &&
+    r[2] === 'R' && g[2] === 'G' && o[2] === 'O' && b[2] === 'B' ? 1 : 0;
+}
+function check_white_face() {
+  return w[1] === 'W' && w[3] === 'W' && w[7] === 'W' && w[9] === 'W' &&
+    r[1] === 'R' && r[3] === 'R' && g[1] === 'G' && g[3] === 'G' &&
+    b[1] === 'B' && b[3] === 'B' && o[1] === 'O' && o[3] === 'O' &&
+    check_white_cross() === 1 ? 1 : 0;
+}
+function check_layer2() {
+  return check_white_face() === 1 && r[4] === 'R' && r[6] === 'R' &&
+    g[4] === 'G' && g[6] === 'G' && o[4] === 'O' && o[6] === 'O' &&
+    b[4] === 'B' && b[6] === 'B' ? 1 : 0;
+}
+function check_yellow_cross() {
+  return check_layer2() === 1 && y[2] === 'Y' && y[4] === 'Y' && y[6] === 'Y' && y[8] === 'Y' ? 1 : 0;
+}
+function check_ORyellow_cross() {
+  return check_yellow_cross() === 1 && r[8] === 'R' && o[8] === 'O' && g[8] === 'G' && b[8] === 'B' ? 1 : 0;
+}
+function check_corner() {
+  return check_ORyellow_cross() && rby() && rgy() && ogy() && oby() ? 1 : 0;
+}
+function check_if_solved() {
+  for (let i = 1; i <= 9; i++) {
+    if (!(r[i] === 'R' && w[i] === 'W' && o[i] === 'O' && y[i] === 'Y' && b[i] === 'B' && g[i] === 'G')) return 0;
+  }
+  return 1;
 }
 
-var Rev = function()
-{
-	if(document.getElementById("checkbox").checked==true)
-	{
-		rev=false;
-		if(document.getElementById("text").innerText!="")
-		{
-			reverse();
-			printSoln();
-		}
-	}
-	else
-	{
-		rev=true;
-		if(document.getElementById("text").innerText!="")
-		{
-			printSoln();
-		}
-	}
+// ---- Step-solver engine (data-driven goWC / goL2) ---------------------------
+// The white-cross and second-layer solvers are large "sticker pattern -> move
+// sequence" lookup tables (below). A pattern (`when`) is a list of clauses, ALL
+// of which must hold; each clause is '|'-separated alternatives; each alternative
+// is space-separated `<face><index>=<colour>` terms (e.g. 'w4=W b2=B'). Moves are
+// strings of solution letters (uppercase = turn, lowercase = prime).
+const TURNS = { R: R, L: L, U: U, D: D, F: F, B: B, r: Rs, l: Ls, u: Us, d: Ds, f: Fs, b: Bs };
+function applyMoves(seq) { for (const c of seq) TURNS[c](); }
+
+// Compile a `when` (array of clause strings) into nested arrays of [faceArray,
+// index, colour] for fast matching at solve time.
+function compileWhen(when) {
+  return when.map((clause) =>
+    clause.split('|').map((conj) =>
+      conj.trim().split(/\s+/).map((term) => {
+        const eq = term.indexOf('=');
+        return [FACES[term[0]], Number(term.slice(1, eq)), term.slice(eq + 1)];
+      })));
+}
+function whenMatches(compiled) {
+  for (const clause of compiled) {
+    let ok = false;
+    for (const conj of clause) {
+      let all = true;
+      for (const [face, idx, colour] of conj) if (face[idx] !== colour) { all = false; break; }
+      if (all) { ok = true; break; }
+    }
+    if (!ok) return false;
+  }
+  return true;
 }
 
-var submit = function()
-{
-	document.getElementById("text").innerText="";
-	Invalid = false;
-	sub: {
-		d = new Date();
-		startT = d.getTime();
+const WHITE_CROSS = [
+  { // 0: blue-white edge
+    solved: ["w4=W b2=B"],
+    cases: [
+      [["w2=W r2=B"], 'UUBLL'],
+      [["w2=B r2=W"], 'UL'],
+      [["w4=B b2=W"], 'FUfL'],
+      [["w6=W g2=B"], 'RRBBLL'],
+      [["w6=B g2=W"], 'fUFL'],
+      [["w8=W o2=B"], 'FlfL'],
+      [["w8=B o2=W"], 'dl'],
+      [["b6=W o4=B"], 'fDF'],
+      [["b6=B o4=W"], 'l'],
+      [["o6=W g6=B"], 'FFRFF'],
+      [["o6=B g6=W"], 'DbdLL'],
+      [["g4=W r6=B"], 'FUf'],
+      [["g4=B r6=W"], 'UULUU'],
+      [["r4=W b4=B"], 'L'],
+      [["r4=B b4=W"], 'Fuf'],
+      [["y2=W o8=B"], 'bLL'],
+      [["y2=B o8=W"], 'Dld'],
+      [["y4=W b8=B"], 'LL'],
+      [["y4=B b8=W"], 'LFuf'],
+      [["y6=W g8=B"], 'BBLL'],
+      [["y6=B g8=W"], 'FBufL'],
+      [["y8=W r8=B"], 'BLL'],
+      [["y8=B r8=W"], 'uLU'],
+    ],
+  },
+  { // 1: red-white edge
+    solved: ["w2=W r2=R"],
+    cases: [
+      [["w2=R r2=W"], 'flFu'],
+      [["w4=W b2=R"], 'FUfu'],
+      [["w4=R b2=W"], 'lu'],
+      [["w6=W g2=R"], 'fUFu'],
+      [["w6=R g2=W"], 'RU'],
+      [["w8=W o2=R"], 'DRRURR'],
+      [["w8=R o2=W"], 'dflF'],
+      [["b6=W o4=R"], 'FFDFF'],
+      [["b6=R o4=W"], 'flF'],
+      [["o6=W g6=R"], 'FRf'],
+      [["o6=R g6=W"], 'FFdFF'],
+      [["g4=W r6=R"], 'U'],
+      [["g4=R r6=W"], 'Frf'],
+      [["r4=W b4=R"], 'fLF'],
+      [["r4=R b4=W"], 'u'],
+      [["y2=W o8=R"], 'BBUU'],
+      [["y2=R o8=W"], 'bLul'],
+      [["y4=W b8=R"], 'bUU'],
+      [["y4=R b8=W"], 'Lul'],
+      [["y6=W g8=R"], 'BUU'],
+      [["y6=R g8=W"], 'rUR'],
+      [["y8=W r8=R"], 'UU'],
+      [["y8=R r8=W"], 'ufLF'],
+    ],
+  },
+  { // 2: orange-white edge
+    solved: ["w8=W o2=O"],
+    cases: [
+      [["w2=W r2=O"], 'UUBBDD'],
+      [["w2=O r2=W"], 'UFLf'],
+      [["w4=W b2=O"], 'dfDF'],
+      [["w4=O b2=W"], 'LD'],
+      [["w6=W g2=O"], 'rfRF'],
+      [["w6=O g2=W"], 'rd'],
+      [["w8=O o2=W"], 'DfRF'],
+      [["b6=W o4=O"], 'D'],
+      [["b6=O o4=W"], 'Flf'],
+      [["o6=W g6=O"], 'fRF'],
+      [["o6=O g6=W"], 'd'],
+      [["g4=W r6=O"], 'RRdRR'],
+      [["g4=O r6=W"], 'frF'],
+      [["r4=W b4=O"], 'FLf'],
+      [["r4=O b4=W"], 'FFuFF'],
+      [["y2=W o8=O"], 'DD'],
+      [["y2=O o8=W"], 'dfRF'],
+      [["y4=W b8=O"], 'BDD'],
+      [["y4=O b8=W"], 'lDL'],
+      [["y6=W g8=O"], 'bDD'],
+      [["y6=O g8=W"], 'Rdr'],
+      [["y8=W r8=O"], 'BBDD'],
+      [["y8=O r8=W"], 'BlDL'],
+    ],
+  },
+  { // 3: green-white edge
+    solved: ["w6=W g2=G"],
+    cases: [
+      [["w2=W r2=G"], 'FRfr'],
+      [["w2=G r2=W"], 'ur'],
+      [["w4=W b2=G"], 'LLBBRR'],
+      [["w4=G b2=W"], 'lfuF'],
+      [["w6=G g2=W"], 'RfUF'],
+      [["w8=W o2=G"], 'fRFr'],
+      [["w8=G o2=W"], 'DR'],
+      [["b6=W o4=G"], 'FDf'],
+      [["b6=G o4=W"], 'DDRDD'],
+      [["o6=W g6=G"], 'R'],
+      [["o6=G g6=W"], 'Fdf'],
+      [["g4=W r6=G"], 'fUF'],
+      [["g4=G r6=W"], 'r'],
+      [["r4=W b4=G"], 'UUrUU'],
+      [["r4=G b4=W"], 'fuF'],
+      [["y2=W o8=G"], 'BRR'],
+      [["y2=G o8=W"], 'dRD'],
+      [["y4=W b8=G"], 'BBRR'],
+      [["y4=G b8=W"], 'BdRD'],
+      [["y6=W g8=G"], 'RR'],
+      [["y6=G g8=W"], 'rfUF'],
+      [["y8=W r8=G"], 'bRR'],
+      [["y8=G r8=W"], 'Uru'],
+    ],
+  },
+];
 
-		for(var i=1;i<=9;i++)
-		{
-			ro[i]=r[i];
-			bo[i]=b[i];
-			wo[i]=w[i];
-			go[i]=g[i];
-			oo[i]=o[i];
-			yo[i]=y[i];
-		}
+const SECOND_LAYER = [
+  { // 0: blue-red pair
+    guard: 'f2l_rb',
+    stages: [
+      { name: 'firstToThird', cases: [
+        [["w1=W r1=R b1=B|w1=B r1=W b1=R|w1=R r1=B b1=W"], 'lbL'],
+        [["w3=W r3=B g1=R|w3=R r3=W g1=B|w3=B r3=R g1=W"], 'Rbr'],
+        [["w9=W g3=B o3=R|w9=R g3=W o3=B|w9=B g3=R o3=W"], 'rbR'],
+        [["w7=W b3=R o1=B|w7=B b3=W o1=R|w7=R b3=B o1=W"], 'Lbl'],
+      ] },
+      { name: 'secondToThird', cases: [
+        [["r4=R b4=B|r4=B b4=R","r7=R b7=W y7=B|r7=B b7=R y7=W|r7=W b7=B y7=R"], 'Ubu'],
+        [["r4=R b4=B|r4=B b4=R"], 'UBu'],
+        [["r6=R g4=B|r6=B g4=R","r9=W g7=R y9=B|r9=B g7=W y9=R|r9=R g7=B y9=W"], 'Rbr'],
+        [["r6=R g4=B|r6=B g4=R"], 'RBr'],
+        [["g6=R o6=B|g6=B o6=R","g9=W o9=R y3=B|g9=B o9=W y3=R|g9=R o9=B y3=W"], 'Dbd'],
+        [["g6=R o6=B|g6=B o6=R"], 'DBd'],
+        [["b6=R o4=B|b6=B o4=R","o7=W b9=R y1=B|o7=B b9=W y1=R|o7=R b9=B y1=W"], 'Lbl'],
+        [["b6=R o4=B|b6=B o4=R"], 'LBl'],
+      ] },
+      { name: 'pairUp', cases: [
+        [["r7=W b7=B b8=B y4=R y7=R"], 'blBL', 1],
+        [["r8=B r9=B y8=R y9=R g7=W"], 'lBL', 1],
+        [["o9=W g8=B g9=B y3=R y6=R"], 'BlBL', 1],
+        [["o7=B o8=B y1=R y2=R b9=W"], 'BBlBL', 1],
+      ] },
+      { name: 'breakUp', cases: [
+        [["o7=B b9=W y1=R|o7=R b9=B y1=W|o7=W b9=R y1=B","o8=R y2=B|o8=B y2=R"], 'lBL'],
+        [["r7=W b7=B y7=R|r7=R b7=W y7=B|r7=B b7=R y7=W","b8=R y4=B|b8=B y4=R"], 'BlBL'],
+        [["r9=B g7=W y9=R|r9=R g7=B y9=W|r9=W g7=R y9=B","r8=R y8=B|r8=B y8=R"], 'BBlBL'],
+        [["o9=W g9=B y3=R|o9=R g9=W y3=B|o9=B g9=R y3=W","g8=R y6=B|g8=B y6=R"], 'blBL'],
+      ] },
+      { name: 'badPairs', cases: [
+        [["o7=B b9=W y1=R|o7=R b9=B y1=W|o7=W b9=R y1=B","b8=R y4=B|b8=B y4=R"], 'BBUbu'],
+        [["r7=W b7=B y7=R|r7=R b7=W y7=B|r7=B b7=R y7=W","r8=R y8=B|r8=B y8=R"], 'bUbu'],
+        [["r9=B g7=W y9=R|r9=R g7=B y9=W|r9=W g7=R y9=B","g8=R y6=B|g8=B y6=R"], 'Ubu'],
+        [["o9=W g9=B y3=R|o9=R g9=W y3=B|o9=B g9=R y3=W","o8=R y2=B|o8=B y2=R"], 'BUbu'],
+      ] },
+      { name: 'whiteOnTop', cases: [
+        [["g9=R o9=B y3=W b8=B y4=R"], 'lbLblBL', 1],
+        [["b9=B o7=R y1=W r8=B y8=R"], 'BlbLblBL', 1],
+        [["r7=B b7=R y7=W y6=R g8=B"], 'BBlbLblBL', 1],
+        [["r9=R g7=B y9=W y2=R o8=B"], 'blbLblBL', 1],
+        [["r9=R g7=B y9=W y4=R b8=B"], 'lBBLblBL', 1],
+        [["g9=R o9=B y3=W r8=B y8=R"], 'BlBBLblBL', 1],
+        [["b9=B o7=R y1=W g8=B y6=R"], 'BBlBBLblBL', 1],
+        [["r7=B b7=R y7=W y2=R o8=B"], 'blBBLblBL', 1],
+        [["g9=R o9=B y3=W r8=R y8=B"], 'UBuBUbu', 1],
+        [["b9=B o7=R y1=W g8=R y6=B"], 'BUBuBUbu', 1],
+        [["r7=B b7=R y7=W y2=B o8=R"], 'BBUBuBUbu', 1],
+        [["r9=R g7=B y9=W y4=B b8=R"], 'bUBuBUbu', 1],
+        [["b9=B o7=R y1=W r8=R y8=B"], 'UBBuBUbu', 1],
+        [["r7=B b7=R y7=W y6=B g8=R"], 'BUBBuBUbu', 1],
+        [["r9=R g7=B y9=W y2=B o8=R"], 'BBUBBuBUbu', 1],
+        [["g9=R o9=B y3=W b8=R y4=B"], 'bUBBuBUbu', 1],
+        [["r9=W g7=R y9=B y2=B o8=R"], 'UBuBBUbu', 1],
+        [["g9=W o9=R y3=B b8=R y4=B"], 'BUBuBBUbu', 1],
+        [["o7=W y1=B b9=R y8=B r8=R"], 'BBUBuBBUbu', 1],
+        [["b7=W r7=R y7=B y6=B g8=R"], 'bUBuBBUbu', 1],
+        [["r9=W g7=R y9=B y4=B b8=R"], 'UBBuBBUbu', 1],
+        [["g9=W o9=R y3=B y8=B r8=R"], 'BUBBuBBUbu', 1],
+        [["o7=W y1=B b9=R y6=B g8=R"], 'BBUBBuBBUbu', 1],
+        [["b7=W r7=R y7=B y2=B o8=R"], 'bUBBuBBUbu', 1],
+        [["b9=W o7=B y1=R y6=R g8=B"], 'lbLBBlBL', 1],
+        [["r7=W b7=B y7=R y2=R o8=B"], 'BlbLBBlBL', 1],
+        [["g7=W r9=B y9=R y4=R b8=B"], 'BBlbLBBlBL', 1],
+        [["o9=W g9=B y3=R y8=R r8=B"], 'blbLBBlBL', 1],
+        [["b9=W o7=B y1=R y8=R r8=B"], 'lBBLBBlBL', 1],
+        [["r7=W b7=B y7=R y6=R g8=B"], 'BlBBLBBlBL', 1],
+        [["g7=W r9=B y9=R y2=R o8=B"], 'BBlBBLBBlBL', 1],
+        [["o9=W g9=B y3=R y4=R b8=B"], 'blBBLBBlBL', 1],
+        [["r7=W b7=B y7=R y6=B g8=R"], 'UBu'],
+        [["g7=W r9=B y9=R y2=B o8=R"], 'BUBu'],
+        [["o9=W g9=B y3=R y4=B b8=R"], 'BBUBu'],
+        [["b9=W o7=B y1=R y8=B r8=R"], 'bUBu'],
+        [["b9=W o7=B y1=R y6=B g8=R"], 'lBLbUBu'],
+        [["r7=W b7=B y7=R y2=B o8=R"], 'BlBLbUBu'],
+        [["g7=W r9=B y9=R y4=B b8=R"], 'BBlBLbUBu'],
+        [["o9=W g9=B y3=R y8=B r8=R"], 'blBLbUBu'],
+        [["b7=W r7=R y7=B y2=R o8=B"], 'lbL'],
+        [["r9=W g7=R y9=B y4=R b8=B"], 'BlbL'],
+        [["g9=W o9=R y3=B y8=R r8=B"], 'BBlbL'],
+        [["o7=W y1=B b9=R y6=R g8=B"], 'blbL'],
+        [["o7=W y1=B b9=R y8=R r8=B"], 'lbLblbL'],
+        [["b7=W r7=R y7=B y6=R g8=B"], 'BlbLblbL'],
+        [["r9=W g7=R y9=B y2=R o8=B"], 'BBlbLblbL'],
+        [["g9=W o9=R y3=B y4=R b8=B"], 'blbLblbL'],
+      ] },
+    ],
+  },
+  { // 1: red-green pair
+    guard: 'f2l_rg',
+    stages: [
+      { name: 'firstToThird', cases: [
+        [["w1=R r1=W b1=G|w1=G r1=R b1=W|w1=W r1=G b1=R"], 'lbL'],
+        [["w3=G r3=W g1=R|w3=R r3=G g1=W|w3=W r3=R g1=G"], 'Rbr'],
+        [["w9=W g3=R o3=G|w9=G g3=W o3=R|w9=R g3=G o3=W"], 'rbR'],
+        [["w7=W b3=G o1=R|w7=R b3=W o1=G|w7=G b3=R o1=W"], 'Lbl'],
+      ] },
+      { name: 'secondToThird', cases: [
+        [["r4=R b4=G|r4=G b4=R","r7=G b7=W y7=R|r7=R b7=G y7=W|r7=W b7=R y7=G"], 'Ubu'],
+        [["r4=R b4=G|r4=G b4=R"], 'UBu'],
+        [["r6=R g4=G|r6=G g4=R","r9=G g7=R y9=W|r9=W g7=G y9=R|r9=R g7=W y9=G"], 'Rbr'],
+        [["r6=R g4=G|r6=G g4=R"], 'RBr'],
+        [["g6=R o6=G|g6=G o6=R","g9=W o9=G y3=R|g9=R o9=W y3=G|g9=G o9=R y3=W"], 'Dbd'],
+        [["g6=R o6=G|g6=G o6=R"], 'DBd'],
+        [["b6=R o4=G|b6=G o4=R","o7=W b9=G y1=R|o7=R b9=W y1=G|o7=G b9=R y1=W"], 'Lbl'],
+        [["b6=R o4=G|b6=G o4=R"], 'LBl'],
+      ] },
+      { name: 'pairUp', cases: [
+        [["r7=W b7=R b8=R y4=G y7=G"], 'BBuBU', 1],
+        [["r8=R r9=R y8=G y9=G g7=W"], 'buBU', 1],
+        [["o9=W g8=R g9=R y3=G y6=G"], 'uBU', 1],
+        [["o7=R o8=R y1=G y2=G b9=W"], 'BuBU', 1],
+      ] },
+      { name: 'breakUp', cases: [
+        [["o7=R b9=W y1=G|o7=G b9=R y1=W|o7=W b9=G y1=R","b8=R y4=G|b8=G y4=R"], 'BRbr'],
+        [["r7=W b7=R y7=G|r7=G b7=W y7=R|r7=R b7=G y7=W","r8=R y8=G|r8=G y8=R"], 'BBRbr'],
+        [["r9=R g7=W y9=G|r9=G g7=R y9=W|r9=W g7=G y9=R","g8=R y6=G|g8=G y6=R"], 'bRbr'],
+        [["o9=W g9=R y3=G|o9=G g9=W y3=R|o9=R g9=G y3=W","o8=R y2=G|o8=G y2=R"], 'Rbr'],
+      ] },
+      { name: 'badPairs', cases: [
+        [["o7=R b9=W y1=G|o7=G b9=R y1=W|o7=W b9=G y1=R","o8=R y2=G|o8=G y2=R"], 'buBU'],
+        [["r7=W b7=R y7=G|r7=G b7=W y7=R|r7=R b7=G y7=W","b8=R y4=G|b8=G y4=R"], 'uBU'],
+        [["r9=R g7=W y9=G|r9=G g7=R y9=W|r9=W g7=G y9=R","r8=R y8=G|r8=G y8=R"], 'BuBU'],
+        [["o9=W g9=R y3=G|o9=G g9=W y3=R|o9=R g9=G y3=W","g8=R y6=G|g8=G y6=R"], 'BBuBU'],
+      ] },
+      { name: 'whiteOnTop', cases: [
+        [["g9=G o9=R y3=W b8=G y4=R"], 'BBRBBrBRbr', 1],
+        [["b9=R o7=G y1=W r8=G y8=R"], 'bRBBrBRbr', 1],
+        [["r7=R b7=G y7=W y6=R g8=G"], 'RBBrBRbr', 1],
+        [["r9=G g7=R y9=W y2=R o8=G"], 'BRBBrBRbr', 1],
+        [["r9=G g7=R y9=W y4=R b8=G"], 'BBRBrBRbr', 1],
+        [["g9=G o9=R y3=W r8=G y8=R"], 'bRBrBRbr', 1],
+        [["b9=R o7=G y1=W g8=G y6=R"], 'RBrBRbr', 1],
+        [["r7=R b7=G y7=W y2=R o8=G"], 'BRBrBRbr', 1],
+        [["g9=G o9=R y3=W r8=R y8=G"], 'uBBUbuBU', 1],
+        [["b9=R o7=G y1=W g8=R y6=G"], 'BuBBUbuBU', 1],
+        [["r7=R b7=G y7=W y2=G o8=R"], 'BBuBBUbuBU', 1],
+        [["r9=G g7=R y9=W y4=G b8=R"], 'buBBUbuBU', 1],
+        [["b9=R o7=G y1=W r8=R y8=G"], 'ubUbuBU', 1],
+        [["r7=R b7=G y7=W y6=G g8=R"], 'BubUbuBU', 1],
+        [["r9=G g7=R y9=W y2=G o8=R"], 'BBubUbuBU', 1],
+        [["g9=G o9=R y3=W b8=R y4=G"], 'bubUbuBU', 1],
+        [["r9=R g7=W y9=G y2=G o8=R"], 'BuBBUBBuBU', 1],
+        [["g9=R o9=W y3=G b8=R y4=G"], 'BBuBBUBBuBU', 1],
+        [["o7=R y1=G b9=W y8=G r8=R"], 'buBBUBBuBU', 1],
+        [["b7=R r7=W y7=G y6=G g8=R"], 'uBBUBBuBU', 1],
+        [["r9=R g7=W y9=G y4=G b8=R"], 'BubUBBuBU', 1],
+        [["g9=R o9=W y3=G y8=G r8=R"], 'BBubUBBuBU', 1],
+        [["o7=R y1=G b9=W y6=G g8=R"], 'bubUBBuBU', 1],
+        [["b7=R r7=W y7=G y2=G o8=R"], 'ubUBBuBU', 1],
+        [["b9=G o7=W y1=R y6=R g8=G"], 'BRBBrBBRbr', 1],
+        [["r7=G b7=W y7=R y2=R o8=G"], 'BBRBBrBBRbr', 1],
+        [["g7=G r9=W y9=R y4=R b8=G"], 'bRBBrBBRbr', 1],
+        [["o9=G g9=W y3=R y8=R r8=G"], 'RBBrBBRbr', 1],
+        [["b9=G o7=W y1=R y8=R r8=G"], 'BRBrBBRbr', 1],
+        [["r7=G b7=W y7=R y6=R g8=G"], 'BBRBrBBRbr', 1],
+        [["g7=G r9=W y9=R y2=R o8=G"], 'bRBrBBRbr', 1],
+        [["o9=G g9=W y3=R y4=R b8=G"], 'RBrBBRbr', 1],
+        [["r7=G b7=W y7=R y6=G g8=R"], 'ubUbubU', 1],
+        [["g7=G r9=W y9=R y2=G o8=R"], 'BubUbubU', 1],
+        [["o9=G g9=W y3=R y4=G b8=R"], 'BBubUbubU', 1],
+        [["b9=G o7=W y1=R y8=G r8=R"], 'bubUbubU', 1],
+        [["b9=G o7=W y1=R y6=G g8=R"], 'BBubU', 1],
+        [["r7=G b7=W y7=R y2=G o8=R"], 'bubU', 1],
+        [["g7=G r9=W y9=R y4=G b8=R"], 'ubU', 1],
+        [["o9=G g9=W y3=R y8=G r8=R"], 'BubU', 1],
+        [["b7=R r7=W y7=G y2=R o8=G"], 'uBUbRBr', 1],
+        [["r9=R g7=W y9=G y4=R b8=G"], 'BuBUbRBr', 1],
+        [["g9=R o9=W y3=G y8=R r8=G"], 'BBuBUbRBr', 1],
+        [["o7=R b9=W y1=G y6=R g8=G"], 'buBUbRBr', 1],
+        [["o7=R b9=W y1=G y8=R r8=G"], 'BBRBr', 1],
+        [["b7=R r7=W y7=G y6=R g8=G"], 'bRBr', 1],
+        [["r9=R g7=W y9=G y2=R o8=G"], 'RBr', 1],
+        [["g9=R o9=W y3=G y4=R b8=G"], 'BRBr', 1],
+      ] },
+    ],
+  },
+  { // 2: orange-green pair
+    guard: 'f2l_go',
+    stages: [
+      { name: 'firstToThird', cases: [
+        [["w1=O r1=G b1=W|w1=W r1=O b1=G|w1=G r1=W b1=O"], 'lbL'],
+        [["w3=W r3=G g1=O|w3=O r3=W g1=G|w3=G r3=O g1=W"], 'Rbr'],
+        [["w9=W g3=G o3=O|w9=O g3=W o3=G|w9=G g3=O o3=W"], 'rbR'],
+        [["w7=W b3=O o1=G|w7=G b3=W o1=O|w7=O b3=G o1=W"], 'Lbl'],
+      ] },
+      { name: 'secondToThird', cases: [
+        [["r4=O b4=G|r4=G b4=O","r7=W b7=G y7=O|r7=O b7=W y7=G|r7=G b7=O y7=W"], 'Ubu'],
+        [["r4=O b4=G|r4=G b4=O"], 'UBu'],
+        [["r6=O g4=G|r6=G g4=O","r9=G g7=W y9=O|r9=O g7=G y9=W|r9=W g7=O y9=G"], 'Rbr'],
+        [["r6=O g4=G|r6=G g4=O"], 'RBr'],
+        [["g6=O o6=G|g6=G o6=O","g9=G o9=W y3=O|g9=O o9=G y3=W|g9=W o9=O y3=G"], 'Dbd'],
+        [["g6=O o6=G|g6=G o6=O"], 'DBd'],
+        [["b6=O o4=G|b6=G o4=O","o7=O b9=G y1=W|o7=W b9=O y1=G|o7=G b9=W y1=O"], 'Lbl'],
+        [["b6=O o4=G|b6=G o4=O"], 'LBl'],
+      ] },
+      { name: 'pairUp', cases: [
+        [["r9=W g7=O g8=O y6=G y9=G"], 'Dbd', 1],
+        [["g9=W o8=O o9=O y2=G y3=G"], 'BDbd', 1],
+        [["o7=W b8=O b9=O y1=G y4=G"], 'BBDbd', 1],
+        [["b7=W r7=O r8=O y7=G y8=G"], 'bDbd', 1],
+      ] },
+      { name: 'breakUp', cases: [
+        [["o7=O b9=G y1=W|o7=W b9=O y1=G|o7=G b9=W y1=O","o8=O y2=G|o8=G y2=O"], 'BBrBR'],
+        [["r7=G b7=O y7=W|r7=W b7=G y7=O|r7=O b7=W y7=G","b8=O y4=G|b8=G y4=O"], 'brBR'],
+        [["r9=O g7=G y9=W|r9=W g7=O y9=G|r9=G g7=W y9=O","r8=O y8=G|r8=G y8=O"], 'rBR'],
+        [["o9=G g9=O y3=W|o9=W g9=G y3=O|o9=O g9=W y3=G","g8=O y6=G|g8=G y6=O"], 'BrBR'],
+      ] },
+      { name: 'badPairs', cases: [
+        [["o7=O b9=G y1=W|o7=W b9=O y1=G|o7=G b9=W y1=O","b8=O y4=G|b8=G y4=O"], 'Dbd'],
+        [["r7=G b7=O y7=W|r7=W b7=G y7=O|r7=O b7=W y7=G","r8=O y8=G|r8=G y8=O"], 'BDbd'],
+        [["r9=O g7=G y9=W|r9=W g7=O y9=G|r9=G g7=W y9=O","g8=O y6=G|g8=G y6=O"], 'BBDbd'],
+        [["o9=G g9=O y3=W|o9=W g9=G y3=O|o9=O g9=W y3=G","o8=O y2=G|o8=G y2=O"], 'bDbd'],
+      ] },
+      { name: 'whiteOnTop', cases: [
+        [["g9=O o9=G y3=W b8=G y4=O"], 'BBrbRbrBR', 1],
+        [["b9=G o7=O y1=W r8=G y8=O"], 'brbRbrBR', 1],
+        [["r7=G b7=O y7=W y6=O g8=G"], 'rbRbrBR', 1],
+        [["r9=O g7=G y9=W y2=O o8=G"], 'BrbRbrBR', 1],
+        [["r9=O g7=G y9=W b8=G y4=O"], 'BBrBBRbrBR', 1],
+        [["g9=O o9=G y3=W r8=G y8=O"], 'brBBRbrBR', 1],
+        [["b9=G o7=O y1=W g8=G y6=O"], 'rBBRbrBR', 1],
+        [["r7=G b7=O y7=W o8=G y2=O"], 'BrBBRbrBR', 1],
+        [["g9=O o9=G y3=W r8=O y8=G"], 'BBDBdBDbd', 1],
+        [["b9=G o7=O y1=W g8=O y6=G"], 'bDBdBDbd', 1],
+        [["r7=G b7=O y7=W y2=G o8=O"], 'DBdBDbd', 1],
+        [["r9=O g7=G y9=W y4=G b8=O"], 'BDBdBDbd', 1],
+        [["b9=G o7=O y1=W r8=O y8=G"], 'BBDBBdBDbd', 1],
+        [["r7=G b7=O y7=W y6=G g8=O"], 'bDBBdBDbd', 1],
+        [["r9=O g7=G y9=W y2=G o8=O"], 'DBBdBDbd', 1],
+        [["g9=O o9=G y3=W b8=O y4=G"], 'BDBBdBDbd', 1],
+        [["r9=W g7=O y9=G y2=G o8=O"], 'BBDBdBBDbd', 1],
+        [["g9=W o9=O y3=G y4=G b8=O"], 'bDBdBBDbd', 1],
+        [["o7=W b9=O y1=G y8=G r8=O"], 'DBdBBDbd', 1],
+        [["b7=W r7=O y7=G y6=G g8=O"], 'BDBdBBDbd', 1],
+        [["r9=W g7=O y9=G y4=G b8=O"], 'BBDBBdBBDbd', 1],
+        [["g9=W o9=O y3=G y8=G r8=O"], 'bDBBdBBDbd', 1],
+        [["o7=W b9=O y1=G y6=G g8=O"], 'DBBdBBDbd', 1],
+        [["b7=W r7=O y7=G y2=G o8=O"], 'BDBBdBBDbd', 1],
+        [["b9=W o7=G y1=O y6=O g8=G"], 'BBrbRBBrBR', 1],
+        [["r7=W b7=G y7=O y2=O o8=G"], 'brbRBBrBR', 1],
+        [["g7=W r9=G y9=O y4=O b8=G"], 'rbRBBrBR', 1],
+        [["o9=W g9=G y3=O y8=O r8=G"], 'BrbRBBrBR', 1],
+        [["b9=W o7=G y1=O y8=O r8=G"], 'BBrBBRBBrBR', 1],
+        [["r7=W b7=G y7=O y6=O g8=G"], 'brBBRBBrBR', 1],
+        [["g7=W r9=G y9=O y2=O o8=G"], 'rBBRBBrBR', 1],
+        [["o9=W g9=G y3=O y4=O b8=G"], 'BrBBRBBrBR', 1],
+        [["r7=W b7=G y7=O y6=G g8=O"], 'BBDBd', 1],
+        [["g7=W r9=G y9=O y2=G o8=O"], 'bDBd', 1],
+        [["o9=W g9=G y3=O y4=G b8=O"], 'DBd', 1],
+        [["b9=W o7=G y1=O y8=G r8=O"], 'BDBd', 1],
+        [["b9=W o7=G y1=O y6=G g8=O"], 'BBrBRbDBd', 1],
+        [["r7=W b7=G y7=O y2=G o8=O"], 'brBRbDBd', 1],
+        [["g7=W r9=G y9=O y4=G b8=O"], 'rBRbDBd', 1],
+        [["o9=W g9=G y3=O y8=G r8=O"], 'BrBRbDBd', 1],
+        [["b7=W r7=O y7=G y2=O o8=G"], 'BBrbR', 1],
+        [["r9=W g7=O y9=G y4=O b8=G"], 'brbR', 1],
+        [["g9=W o9=O y3=G y8=O r8=G"], 'rbR', 1],
+        [["o7=W b9=O y1=G y6=O g8=G"], 'BrbR', 1],
+        [["o7=W b9=O y1=G y8=O r8=G"], 'BBrbRbrbR', 1],
+        [["b7=W r7=O y7=G y6=O g8=G"], 'brbRbrbR', 1],
+        [["r9=W g7=O y9=G y2=O o8=G"], 'rbRbrbR', 1],
+        [["g9=W o9=O y3=G y4=O b8=G"], 'BrbRbrbR', 1],
+      ] },
+    ],
+  },
+  { // 3: orange-blue pair
+    guard: 'f2l_bo',
+    stages: [
+      { name: 'firstToThird', cases: [
+        [["w1=W r1=B b1=O|w1=O r1=W b1=B|w1=B r1=O b1=W"], 'lbL'],
+        [["w3=W r3=O g1=B|w3=B r3=W g1=O|w3=O r3=B g1=W"], 'Rbr'],
+        [["w9=W g3=O o3=B|w9=B g3=W o3=O|w9=O g3=B o3=W"], 'rbR'],
+        [["w7=B b3=O o1=W|w7=W b3=B o1=O|w7=O b3=W o1=B"], 'Lbl'],
+      ] },
+      { name: 'secondToThird', cases: [
+        [["r4=O b4=B|r4=B b4=O","r7=W b7=O y7=B|r7=B b7=W y7=O|r7=O b7=B y7=W"], 'Ubu'],
+        [["r4=O b4=B|r4=B b4=O"], 'UBu'],
+        [["r6=O g4=B|r6=B g4=O","r9=W g7=B y9=O|r9=O g7=W y9=B|r9=B g7=O y9=W"], 'Rbr'],
+        [["r6=O g4=B|r6=B g4=O"], 'RBr'],
+        [["g6=O o6=B|g6=B o6=O","g9=O o9=W y3=B|g9=B o9=O y3=W|g9=W o9=B y3=O"], 'Dbd'],
+        [["g6=O o6=B|g6=B o6=O"], 'DBd'],
+        [["b6=O o4=B|b6=B o4=O","o7=B b9=O y1=W|o7=W b9=B y1=O|o7=O b9=W y1=B"], 'Lbl'],
+        [["b6=O o4=B|b6=B o4=O"], 'LBl'],
+      ] },
+      { name: 'pairUp', cases: [
+        [["r9=W g7=B g8=B y6=O y9=O"], 'bLbl', 1],
+        [["g9=W o8=B o9=B y2=O y3=O"], 'Lbl', 1],
+        [["o7=W b8=B b9=B y1=O y4=O"], 'BLbl', 1],
+        [["b7=W r7=B r8=B y7=O y8=O"], 'BBLbl', 1],
+      ] },
+      { name: 'breakUp', cases: [
+        [["o7=B b9=O y1=W|o7=W b9=B y1=O|o7=O b9=W y1=B","o8=O y2=B|o8=B y2=O"], 'BdBD'],
+        [["r7=O b7=B y7=W|r7=W b7=O y7=B|r7=B b7=W y7=O","b8=O y4=B|b8=B y4=O"], 'BBdBD'],
+        [["r9=B g7=O y9=W|r9=W g7=B y9=O|r9=O g7=W y9=B","r8=O y8=B|r8=B y8=O"], 'bdBD'],
+        [["o9=O g9=B y3=W|o9=W g9=O y3=B|o9=B g9=W y3=O","g8=O y6=B|g8=B y6=O"], 'dBD'],
+      ] },
+      { name: 'badPairs', cases: [
+        [["o7=B b9=O y1=W|o7=W b9=B y1=O|o7=O b9=W y1=B","b8=O y4=B|b8=B y4=O"], 'bLbl'],
+        [["r7=O b7=B y7=W|r7=W b7=O y7=B|r7=B b7=W y7=O","r8=O y8=B|r8=B y8=O"], 'Lbl'],
+        [["r9=B g7=O y9=W|r9=W g7=B y9=O|r9=O g7=W y9=B","g8=O y6=B|g8=B y6=O"], 'BLbl'],
+        [["o9=O g9=B y3=W|o9=W g9=O y3=B|o9=B g9=W y3=O","o8=O y2=B|o8=B y2=O"], 'BBLbl'],
+      ] },
+      { name: 'whiteOnTop', cases: [
+        [["g9=B o9=O y3=W b8=B y4=O"], 'LBBlBLbl', 1],
+        [["b9=O o7=B y1=W r8=B y8=O"], 'BLBBlBLbl', 1],
+        [["r7=O b7=B y7=W y6=O g8=B"], 'BBLBBlBLbl', 1],
+        [["r9=B g7=O y9=W y2=O o8=B"], 'bLBBlBLbl', 1],
+        [["r9=B g7=O y9=W b8=B y4=O"], 'LBlBLbl', 1],
+        [["g9=B o9=O y3=W r8=B y8=O"], 'BLBlBLbl', 1],
+        [["b9=O o7=B y1=W g8=B y6=O"], 'BBLBlBLbl', 1],
+        [["r7=O b7=B y7=W o8=B y2=O"], 'bLBlBLbl', 1],
+        [["g9=B o9=O y3=W r8=O y8=B"], 'BBdBBDbdBD', 1],
+        [["b9=O o7=B y1=W g8=O y6=B"], 'bdBBDbdBD', 1],
+        [["r7=O b7=B y7=W y2=B o8=O"], 'dBBDbdBD', 1],
+        [["r9=B g7=O y9=W y4=B b8=O"], 'BdBBDbdBD', 1],
+        [["b9=O o7=B y1=W r8=O y8=B"], 'BBdbDbdBD', 1],
+        [["r7=O b7=B y7=W y6=B g8=O"], 'bdbDbdBD', 1],
+        [["r9=B g7=O y9=W y2=B o8=O"], 'dbDbdBD', 1],
+        [["g9=B o9=O y3=W b8=O y4=B"], 'BdbDbdBD', 1],
+        [["r9=O g7=W y9=B y2=B o8=O"], 'bdBBDBBdBD', 1],
+        [["g9=O o9=W y3=B y4=B b8=O"], 'dBBDBBdBD', 1],
+        [["o7=O b9=W y1=B y8=B r8=O"], 'BdBBDBBdBD', 1],
+        [["b7=O r7=W y7=B y6=B g8=O"], 'BBdBBDBBdBD', 1],
+        [["r9=O g7=W y9=B y4=B b8=O"], 'bdbDBBdBD', 1],
+        [["g9=O o9=W y3=B y8=B r8=O"], 'dbDBBdBD', 1],
+        [["o7=O b9=W y1=B y6=B g8=O"], 'BdbDBBdBD', 1],
+        [["b7=O r7=W y7=B y2=B o8=O"], 'BBdbDBBdBD', 1],
+        [["b9=B o7=W y1=O y6=O g8=B"], 'bLBBlBBLbl', 1],
+        [["r7=B b7=W y7=O y2=O o8=B"], 'LBBlBBLbl', 1],
+        [["g7=B r9=W y9=O y4=O b8=B"], 'BLBBlBBLbl', 1],
+        [["o9=B g9=W y3=O y8=O r8=B"], 'BBLBBlBBLbl', 1],
+        [["b9=B o7=W y1=O y8=O r8=B"], 'bLBlBBLbl', 1],
+        [["r7=B b7=W y7=O y6=O g8=B"], 'LBlBBLbl', 1],
+        [["g7=B r9=W y9=O y2=O o8=B"], 'BLBlBBLbl', 1],
+        [["o9=B g9=W y3=O y4=O b8=B"], 'BBLBlBBLbl', 1],
+        [["r7=B b7=W y7=O y6=B g8=O"], 'BBdbDbdbD', 1],
+        [["g7=B r9=W y9=O y2=B o8=O"], 'bdbDbdbD', 1],
+        [["o9=B g9=W y3=O y4=B b8=O"], 'dbDbdbD', 1],
+        [["b9=B o7=W y1=O y8=B r8=O"], 'BdbDbdbD', 1],
+        [["b9=B o7=W y1=O y6=B g8=O"], 'dbD', 1],
+        [["r7=B b7=W y7=O y2=B o8=O"], 'BdbD', 1],
+        [["g7=B r9=W y9=O y4=B b8=O"], 'BBdbD', 1],
+        [["o9=B g9=W y3=O y8=B r8=O"], 'bdbD', 1],
+        [["b7=O r7=W y7=B y2=O o8=B"], 'LBlBLBl', 1],
+        [["r9=O g7=W y9=B y4=O b8=B"], 'BLBlBLBl', 1],
+        [["g9=O o9=W y3=B y8=O r8=B"], 'BBLBlBLBl', 1],
+        [["o7=O b9=W y1=B y6=O g8=B"], 'bLBlBLBl', 1],
+        [["o7=O b9=W y1=B y8=O r8=B"], 'LBl', 1],
+        [["b7=O r7=W y7=B y6=O g8=B"], 'BLBl', 1],
+        [["r9=O g7=W y9=B y2=O o8=B"], 'BBLBl', 1],
+        [["g9=O o9=W y3=B y4=O b8=B"], 'bLBl', 1],
+      ] },
+    ],
+  },
+];
 
-		print();
-		All_Face_solve();
+// Compile every table pattern once at load (string form above stays readable;
+// runtime uses fast [faceArray, index, colour] tuples).
+for (const branch of WHITE_CROSS) {
+  branch.solved = compileWhen(branch.solved);
+  branch.cases = branch.cases.map(([when, moves]) => ({ when: compileWhen(when), moves }));
+}
+for (const pair of SECOND_LAYER) {
+  for (const stage of pair.stages) {
+    stage.cases = stage.cases.map(([when, moves, brk]) => ({ when: compileWhen(when), moves, brk: !!brk }));
+  }
+}
+const F2L_GUARD = { f2l_rb: f2l_rb, f2l_rg: f2l_rg, f2l_go: f2l_go, f2l_bo: f2l_bo };
 
-		if(Invalid == true)
-		{
-			break sub;
-		}
-
-		printSoln();
-		paste();
-	}
+// Insert one white-cross edge (n = which of the 4 edges). No-op if it is already
+// placed; otherwise apply the first matching case's moves.
+function goWC(n) {
+  const branch = WHITE_CROSS[n];
+  if (!branch || whenMatches(branch.solved)) return;
+  for (const c of branch.cases) {
+    if (whenMatches(c.when)) { applyMoves(c.moves); return; }
+  }
 }
 
-var clearAll = function()
-{
-	location.reload();
+// Insert one second-layer pair (n = which of the 4 pairs). No-op if already
+// placed. Otherwise run the stages in order; within a stage the first matching
+// case fires, then we advance to the next stage — unless that case is terminal
+// (it completed the pair), which ends the call. Earlier stages deliberately fall
+// through so a later stage re-reads the now-mutated cube.
+function goL2(n) {
+  const pair = SECOND_LAYER[n];
+  if (!pair || F2L_GUARD[pair.guard]()) return;
+  for (const stage of pair.stages) {
+    for (const c of stage.cases) {
+      if (whenMatches(c.when)) { applyMoves(c.moves); if (c.brk) return; break; }
+    }
+  }
 }
 
-var paste = function()
-{
-	for(var i=1;i<=9;i++)
-	{
-		document.getElementById("R"+String(i)).className="button"+" "+r[i];
-		document.getElementById("B"+String(i)).className="button"+" "+b[i];
-		document.getElementById("W"+String(i)).className="button"+" "+w[i];
-		document.getElementById("G"+String(i)).className="button"+" "+g[i];
-		document.getElementById("O"+String(i)).className="button"+" "+o[i];
-		document.getElementById("Y"+String(i)).className="button"+" "+y[i];
-	}
+// ---- Re-orientation ---------------------------------------------------------
+// Cycle the four colours of `order` on every sticker (C[k] -> C[k+1]). Used to
+// relabel the cube so a different colour becomes the starting cross.
+function cycleColors(order) {
+  const next = {};
+  for (let i = 0; i < order.length; i++) next[order[i]] = order[(i + 1) % order.length];
+  for (const face of WORK) for (let i = 1; i <= 9; i++) if (next[face[i]] !== undefined) face[i] = next[face[i]];
+}
+function Ocenter() { cycleColors(['W', 'R', 'Y', 'O']); X(); }
+function Ycenter() { Ocenter(); Ocenter(); }
+function Rcenter() { Ocenter(); Ocenter(); Ocenter(); }
+function Gcenter() { cycleColors(['W', 'B', 'Y', 'G']); Y(); }
+function Bcenter() { Gcenter(); Gcenter(); Gcenter(); }
+
+// ---- The brute-force solver -------------------------------------------------
+// Recurring last-layer algorithms (each cycles three last-layer pieces). Named
+// by the face they target and which of the two variants.
+const LL = {
+  R1: 'UBBubUbudBBDBdBD', R2: 'dbDbdBBDUBuBUBBu',
+  B1: 'LBBlbLblrBBRBrBR', B2: 'rbRbrBBRLBlBLBBl',
+  O1: 'DBBdbDbduBBUBuBU', O2: 'ubUbuBBUDBdBDBBd',
+  G1: 'RBBrbRbrlBBLBlBL', G2: 'lbLblBBLRBrBRBBr',
+};
+
+function timedOut() { return new Date().getTime() - startT > maxTime; }
+function abortInvalid() { copyState(WORK, INPUT_BACKUP); alert('Invalid configuration'); Invalid = true; }
+
+// Try every ordering of the 4 white-cross edge insertions and the 4 second-layer
+// pair insertions, solving fully each time and keeping the shortest in `minimum`.
+function solve() {
+  BRsolve: {
+    while (minimum.length < SOLUTION_CAP) minimum += 'a';
+    copyState(SOLVE_BACKUP, WORK);
+
+    for (let i = 0; i <= 23; i++) {
+      for (let j = 0; j <= 23; j++) {
+        original = '';
+        final = '';
+        copyState(WORK, SOLVE_BACKUP);
+
+        const crossOrder = permutation(i); // order to insert the 4 white-cross edges
+        const pairOrder = permutation(j);  // order to insert the 4 second-layer pairs
+
+        // 1. White cross
+        while (check_white_cross() === 0) {
+          if (timedOut()) { abortInvalid(); break BRsolve; }
+          goWC(crossOrder[0]); goWC(crossOrder[1]); goWC(crossOrder[2]); goWC(crossOrder[3]);
+        }
+
+        // 2. First two layers
+        while (check_layer2() === 0) {
+          if (timedOut()) { abortInvalid(); break BRsolve; }
+          goL2(pairOrder[0]); goL2(pairOrder[1]); goL2(pairOrder[2]); goL2(pairOrder[3]);
+        }
+
+        // 3. Yellow cross
+        while (check_yellow_cross() === 0) {
+          if (timedOut()) { abortInvalid(); break BRsolve; }
+          if ((y[8] === 'Y' && y[6] === 'Y' && y[2] !== 'Y' && y[4] !== 'Y') || (y[2] !== 'Y' && y[4] !== 'Y' && y[6] !== 'Y' && y[8] !== 'Y') || (y[4] === 'Y' && y[6] === 'Y' && y[2] !== 'Y' && y[8] !== 'Y')) applyMoves('URBrbu');
+          else if ((y[8] === 'Y' && y[4] === 'Y' && y[2] !== 'Y' && y[6] !== 'Y') || (y[2] === 'Y' && y[8] === 'Y' && y[4] !== 'Y' && y[6] !== 'Y')) applyMoves('LUBubl');
+          else if (y[4] === 'Y' && y[2] === 'Y' && y[8] !== 'Y' && y[6] !== 'Y') applyMoves('DLBlbd');
+          else if (y[6] === 'Y' && y[2] === 'Y' && y[4] !== 'Y' && y[8] !== 'Y') applyMoves('RDBdbr');
+        }
+
+        // 4. Orient the yellow cross edges (permute via B until two are aligned)
+        while (check_ORyellow_cross() === 0) {
+          if (timedOut()) { abortInvalid(); break BRsolve; }
+          while (!((r[8] === 'R' && b[8] === 'B') || (r[8] === 'R' && g[8] === 'G') || (r[8] === 'R' && o[8] === 'O') || (b[8] === 'B' && g[8] === 'G') || (b[8] === 'B' && o[8] === 'O') || (g[8] === 'G' && o[8] === 'O'))) B();
+          if (g[8] === 'G' && o[8] === 'O') applyMoves('UBBubUbub');
+          else if (b[8] === 'B' && o[8] === 'O') applyMoves('RBBrbRbrb');
+          else if (b[8] === 'B' && g[8] === 'G') applyMoves('UBBubUbubLBBlbLblb');
+          else if (r[8] === 'R' && o[8] === 'O') applyMoves('LBBlbLblbDBBdbDbdb');
+          else if (r[8] === 'R' && g[8] === 'G') applyMoves('LBBlbLblb');
+          else if (r[8] === 'R' && b[8] === 'B') applyMoves('DBBdbDbdb');
+        }
+
+        // 5. Position the last-layer corners
+        while (check_corner() === 0) {
+          if (timedOut()) { abortInvalid(); break BRsolve; }
+          if (rby()) {
+            if ((r[9] === 'B' && g[7] === 'Y' && y[9] === 'O') || (r[9] === 'O' && g[7] === 'B' && y[9] === 'Y') || (r[9] === 'Y' && g[7] === 'O' && y[9] === 'B')) applyMoves('dBUbDBub');
+            else applyMoves('BUbdBubD');
+          } else if (oby()) {
+            if ((r[9] === 'R' && g[7] === 'Y' && y[9] === 'B') || (r[9] === 'B' && g[7] === 'R' && y[9] === 'Y') || (r[9] === 'Y' && g[7] === 'B' && y[9] === 'R')) applyMoves('rBLbRBlb');
+            else applyMoves('BLbrBlbR');
+          } else if (ogy()) {
+            if ((r[9] === 'R' && g[7] === 'Y' && y[9] === 'B') || (r[9] === 'B' && g[7] === 'R' && y[9] === 'Y') || (r[9] === 'Y' && g[7] === 'B' && y[9] === 'R')) applyMoves('uBDbUBdb');
+            else applyMoves('BDbuBdbU');
+          } else {
+            // The first disjunct intentionally reads r[1]/b[7]/y[7] (not the r[9]/g[7]/y[9]
+            // family of the sibling branches) — faithful to the original last-corner case.
+            if ((r[1] === 'Y' && b[7] === 'B' && y[7] === 'O') || (r[9] === 'O' && g[7] === 'Y' && y[9] === 'B') || (r[9] === 'B' && g[7] === 'O' && y[9] === 'Y')) applyMoves('lBRbLBrb');
+            else applyMoves('BRblBrbL');
+          }
+        }
+
+        // 6. Orient the last-layer corners (cycle three pieces at a time)
+        while (check_if_solved() === 0) {
+          if (timedOut()) { abortInvalid(); break BRsolve; }
+          // two adjacent pieces flipped
+          if (y[1] === 'Y' && y[3] === 'Y') applyMoves(r[7] === 'Y' && r[9] === 'Y' ? LL.R1 : LL.R2);
+          else if (y[3] === 'Y' && y[9] === 'Y') applyMoves(b[7] === 'Y' && b[9] === 'Y' ? LL.B1 : LL.B2);
+          else if (y[7] === 'Y' && y[9] === 'Y') applyMoves(o[7] === 'Y' && o[9] === 'Y' ? LL.O1 : LL.O2);
+          else if (y[1] === 'Y' && y[7] === 'Y') applyMoves(g[7] === 'Y' && g[9] === 'Y' ? LL.G1 : LL.G2);
+          // two diagonal pieces
+          else if (y[1] === 'Y' && y[9] === 'Y') applyMoves(r[7] === 'Y' && g[9] === 'Y' ? LL.R1 + LL.G1 : LL.R2 + LL.G2);
+          else if (y[3] === 'Y' && y[7] === 'Y') applyMoves(g[7] === 'Y' && o[7] === 'Y' ? LL.G1 + LL.O1 : LL.G2 + LL.O2);
+          // three correct on top
+          else if (y[1] === 'Y') applyMoves(r[7] === 'Y' && g[7] === 'G' && o[9] === 'Y' ? LL.R1 + LL.G2 : LL.R2 + LL.G1);
+          else if (y[3] === 'Y') applyMoves(b[9] === 'Y' && r[7] === 'Y' && g[7] === 'Y' ? LL.B1 + LL.R2 : LL.B2 + LL.R1);
+          else if (y[7] === 'Y') applyMoves(g[7] === 'Y' && o[9] === 'Y' && b[9] === 'Y' ? LL.G1 + LL.O2 : LL.G2 + LL.O1);
+          else if (y[9] === 'Y') applyMoves(r[7] === 'Y' && b[9] === 'Y' && o[9] === 'Y' ? LL.O1 + LL.B2 : LL.O2 + LL.B1);
+          // all four mis-oriented
+          else if (r[7] === 'Y' && r[9] === 'Y') applyMoves(LL.R1);
+          else if (b[7] === 'Y' && g[7] === 'Y') applyMoves(LL.R2);
+          else if (b[7] === 'Y' && b[9] === 'Y') applyMoves(LL.B1);
+          else if (b[7] === 'R' && b[9] === 'O') applyMoves(LL.B2);
+          else if (o[7] === 'Y' && o[9] === 'Y') applyMoves(LL.O1);
+          else if (o[7] === 'B' && o[9] === 'G') applyMoves(LL.O2);
+          else if (g[7] === 'Y' && g[9] === 'Y') applyMoves(LL.G1);
+          else if (g[7] === 'R' && g[9] === 'O') applyMoves(LL.G2);
+        }
+
+        compress();
+        if (minimum.length > final.length) minimum = final;
+      }
+    }
+  }
 }
 
-var Mclick = function(click_id)
-{
-	if(click_id[1]=='R'){ R(); paste(); }
-	else if(click_id[1]=='r'){ Rs(); paste(); }
-	else if(click_id[1]=='L'){ L();  paste(); }
-	else if(click_id[1]=='l'){ Ls(); paste(); }
-	else if(click_id[1]=='B'){ B();  paste(); }
-	else if(click_id[1]=='b'){ Bs(); paste(); }
-	else if(click_id[1]=='D'){ D();  paste(); }
-	else if(click_id[1]=='d'){ Ds(); paste(); }
-	else if(click_id[1]=='F'){ F();  paste(); }
-	else if(click_id[1]=='f'){ Fs(); paste(); }
-	else if(click_id[1]=='U'){ U();  paste(); }
-	else if(click_id[1]=='u'){ Us(); paste(); }
+// The 6 cube orientations to solve from; the shortest wins. Each (except white)
+// re-centres the cube, prepends the rotation markers, then transform() rewrites
+// the moves back into the original frame.
+const ORIENTATIONS = [
+  { recenter: null, prefix: '', color: 1, name: 'WHITE' },
+  { recenter: Ocenter, prefix: 'X', color: 2, name: 'ORANGE' },
+  { recenter: Ycenter, prefix: 'XX', color: 3, name: 'YELLOW' },
+  { recenter: Rcenter, prefix: 'XXX', color: 4, name: 'RED' },
+  { recenter: Gcenter, prefix: 'Y', color: 5, name: 'GREEN' },
+  { recenter: Bcenter, prefix: 'YYY', color: 6, name: 'BLUE' },
+];
+
+// True when the 54-char string holds exactly 9 stickers of each cube colour.
+function hasValidColorCounts(s) {
+  return s.length === 54 && ['R', 'B', 'W', 'G', 'O', 'Y'].every((c) => s.split(c).length - 1 === 9);
 }
 
-var Scramble = function()
-{
-	document.getElementById("text").innerText="";
-	for(var i=1;i<=9;i++)
-	{
-		r[i]='R';
-		b[i]='B';
-		w[i]='W';
-		g[i]='G';
-		o[i]='O';
-		y[i]='Y';
-	}
+function All_Face_solve() {
+  const s = document.getElementById('textarea').value;
+  if (!hasValidColorCounts(s)) { alert('Invalid configuration'); return; }
 
-	for(var i=0;i<100;i++)
-	{
-		var num = Math.floor(Math.random() * 12);
-		switch(num)
-		{
-			case 0:
-				B();
-				break;
-			case 1:
-				U();
-				break;
-			case 2:
-				F();
-				break;
-			case 3:
-				D();
-				break;
-			case 4:
-				R();
-				break;
-			case 5:
-				L();
-				break;
-			case 6:
-				Rs();
-				break;
-			case 7:
-				Ls();
-				break;
-			case 8:
-				Fs();
-				break;
-			case 9:
-				Us();
-				break;
-			case 10:
-				Bs();
-				break;
-			case 11:
-				Ds();
-				break;
-		}
-	}
-	paste();
+  // First orientation (white): solve and seed the best result.
+  color = 1;
+  solve();
+  if (Invalid === true) return;
+  recompress();
+  mini = minimum;
+
+  // Remaining orientations: re-centre, solve, translate back, keep the shortest.
+  for (let k = 1; k < ORIENTATIONS.length; k++) {
+    const orient = ORIENTATIONS[k];
+    copyState(WORK, INPUT_BACKUP);
+    orient.recenter();
+    solve();
+    minimum = orient.prefix + minimum;
+    transform();
+    recompress();
+    if (mini.length > minimum.length) { mini = minimum; color = orient.color; }
+  }
+
+  minimum = mini;
+  col = ORIENTATIONS.find((orient) => orient.color === color).name;
 }
 
-var SolvedState = function()
-{
-	document.getElementById("text").innerText="";
-	for(var i=1;i<=9;i++)
-	{
-		r[i]='R';
-		b[i]='B';
-		w[i]='W';
-		g[i]='G';
-		o[i]='O';
-		y[i]='Y';
-	}
-	paste();
+/* =============================================================================
+ * UI / DOM layer — the only code that touches the page.
+ * ========================================================================== */
+
+// Reset all six faces to a solved cube.
+function setSolved() {
+  for (let i = 1; i <= 9; i++) { r[i] = 'R'; w[i] = 'W'; o[i] = 'O'; y[i] = 'Y'; b[i] = 'B'; g[i] = 'G'; }
 }
 
-var help = function()
-{
-	var s="   ",S="                      ";
-	var A="\n";
-
-	A=A+S+"R7 R8 R9\n";
-	A=A+S+"R4 R5 R6\n";
-	A=A+S+"R1 R2 R3\n\n";
-
-	A=A+s+"B7 B4 B1"+s+"W1 W2 W3"+s+"G1 G4 G7\n"
-	A=A+s+"B8 B5 B2"+s+"W4 W5 W6"+s+"G2 G5 G8\n"
-	A=A+s+"B9 B6 B3"+s+"W7 W8 W9"+s+"G3 G6 G9\n\n"
-
-	A=A+S+"O1 O2 O3\n";
-	A=A+S+"O4 O5 O6\n";
-	A=A+S+"O7 O8 O9\n\n";
-
-	A=A+S+"Y1 Y2 Y3\n";
-	A=A+S+"Y4 Y5 Y6\n";
-	A=A+S+"Y7 Y8 Y9\n\n";
-
-	A=A+"HOLD THE CUBE WITH THE WHITE CENTER FACING YOU, RED CENTER POINTING UP AND GREEN CENTER POINTING RIGHT AS SHOWN ABOVE AND IN THE IMAGE\n\n"
-	A=A+"NOW ENTER THE THE FACE VALUE ( R / B / W / G / O / Y) ONLY\n\n";
-	A=A+"ENTER STARTING FROM R1 TO R9 THEN B1 TO B9 THEN W1 TO W9 THEN G1 TO G9 THEN O1 TO O9 THEN Y1 TO Y9 RESPECTIVELY";
-	alert(A);
+// Paint the clicked sticker with the currently selected colour.
+function buttonClick(click_id) {
+  if (selected_color === '0') return;
+  document.getElementById(click_id).className = 'button ' + selected_color;
+  FACES[click_id[0].toLowerCase()][parseInt(click_id[1], 10)] = selected_color;
 }
 
-var help2 = function()
-{
-	alert("When ON, the solution will be the set of moves that will transform a Solved Cube into the Input State");
+// Choose the paint colour from the picker.
+function pickColor(click_id) {
+  selected_color = click_id;
+  document.getElementById('selectedColor').className = 'button ' + click_id;
 }
 
-///////////////////////////////////////////////////////////////////////////
-
-function compress()
-{
-	final="";
-
-	for(var i=0;i<original.length;i++)
-	{
-		if(  i+2<original.length && original[i]==original[i+1] && original[i]==original[i+2]  )
-		{
-			if(  original[i]!=original[i+3]  )
-			{
-				final = final + original[i].toLowerCase();
-				i=i+2;
-			}
-			else
-			{
-				i=i+3;
-			}
-		}
-		else
-		{
-			final = final + original[i];
-		}
-	}
+// Serialise the painted cube into the 54-char input string (order R B W G O Y).
+function print() {
+  let s = '';
+  for (const face of [r, b, w, g, o, y]) for (let i = 1; i <= 9; i++) s += face[i];
+  if (!s.includes('0')) document.getElementById('textarea').value = s;
 }
 
-
-var fact = function(n)
-{
-	var i=0,j=0,a=[0,0,0,0],use=[0,0,0,0],ans=0;
-
-	i=1;
-	while(n>0)
-	{
-		i++;
-		a[i-1]=n%i;
-		n=n/i;
-	}
-	
-    for(i=3;i>=0;i--)
-    {
-        n=a[i];
-        
-        j=0;
-        
-        while(n>=0)
-        {
-            if(use[j]==0)
-            {
-                n--;
-                j++;
-            }
-            else
-            {
-                j++;
-            }
-        }     
-        j--;
-        
-        ans=ans*10;
-        ans=ans+j;
-        
-        use[j]=1;              
-    }  
-    return ans;
+// Load a 54-char string into the cube (must have 9 of each colour and correct centres).
+function stringInput() {
+  const s = document.getElementById('textarea').value.toUpperCase();
+  if (hasValidColorCounts(s) && s[4] === 'R' && s[13] === 'B' && s[22] === 'W' && s[31] === 'G' && s[40] === 'O' && s[49] === 'Y') {
+    const faces = [r, b, w, g, o, y];
+    for (let f = 0; f < 6; f++) for (let i = 0; i < 9; i++) faces[f][i + 1] = s[f * 9 + i];
+    paste();
+  } else {
+    alert('Invalid Input');
+  }
 }
 
-var F = function()
-{
-	original = original + 'F';
-
-	var t=w[8]; w[8]=w[6]; w[6]=w[2]; w[2]=w[4]; w[4]=t;
-		t=w[7]; w[7]=w[9]; w[9]=w[3]; w[3]=w[1]; w[1]=t;
-		t=o[3]; o[3]=g[1]; g[1]=r[1]; r[1]=b[3]; b[3]=t;
-		t=o[2]; o[2]=g[2]; g[2]=r[2]; r[2]=b[2]; b[2]=t;
-		t=o[1]; o[1]=g[3]; g[3]=r[3]; r[3]=b[1]; b[1]=t;
+// Render the solution text (grouped 4 moves per line, with move count + colour).
+function printSoln() {
+  if (rev === true) reverse();
+  recompress();
+  let str = '';
+  for (let i = 0; i < minimum.length; i++) {
+    if (i % 4 === 0 && i !== 0) str += '\n';
+    str += minimum[i] + ' ';
+  }
+  str += '\nNo of Moves = ' + String(minimum.length) + '\n' + col;
+  if (minimum.length > 0) document.getElementById('text').innerText = str;
 }
 
-var B = function()
-{
-	original = original + 'B';
-
-	var t=y[7]; y[7]=y[9]; y[9]=y[3]; y[3]=y[1]; y[1]=t;
-		t=y[4]; y[4]=y[8]; y[8]=y[6]; y[6]=y[2]; y[2]=t;
-		t=r[9]; r[9]=g[9]; g[9]=o[7]; o[7]=b[7]; b[7]=t;
-		t=r[8]; r[8]=g[8]; g[8]=o[8]; o[8]=b[8]; b[8]=t;
-		t=r[7]; r[7]=g[7]; g[7]=o[9]; o[9]=b[9]; b[9]=t;
+// Invert the solution (reverse order, swap turn <-> prime) for the "reverse" toggle.
+function reverse() {
+  let temp = '';
+  for (let i = minimum.length - 1; i >= 0; i--) temp += minimum[i] > 'a' ? minimum[i].toUpperCase() : minimum[i].toLowerCase();
+  minimum = temp;
+}
+function Rev() {
+  const showing = document.getElementById('text').innerText !== '';
+  if (document.getElementById('checkbox').checked === true) {
+    rev = false;
+    if (showing) { reverse(); printSoln(); }
+  } else {
+    rev = true;
+    if (showing) printSoln();
+  }
 }
 
-var R = function()
-{
-	original = original + 'R';
-
-	var t=w[3]; w[3]=o[3]; o[3]=y[3]; y[3]=r[9]; r[9]=t;
-		t=w[6]; w[6]=o[6]; o[6]=y[6]; y[6]=r[6]; r[6]=t;
-		t=w[9]; w[9]=o[9]; o[9]=y[9]; y[9]=r[3]; r[3]=t;
-		t=g[3]; g[3]=g[9]; g[9]=g[7]; g[7]=g[1]; g[1]=t;
-		t=g[2]; g[2]=g[6]; g[6]=g[8]; g[8]=g[4]; g[4]=t;
+// Solve the painted/typed cube.
+function submit() {
+  document.getElementById('text').innerText = '';
+  Invalid = false;
+  startT = new Date().getTime();
+  copyState(INPUT_BACKUP, WORK);
+  print();
+  All_Face_solve();
+  if (Invalid === true) return;
+  printSoln();
+  paste();
 }
 
-var L = function()
-{
-	original = original + 'L';
+function clearAll() { location.reload(); }
 
-	var t=r[7]; r[7]=y[1]; y[1]=o[1]; o[1]=w[1]; w[1]=t;
-		t=r[4]; r[4]=y[4]; y[4]=o[4]; o[4]=w[4]; w[4]=t;
-		t=r[1]; r[1]=y[7]; y[7]=o[7]; o[7]=w[7]; w[7]=t;
-		t=b[7]; b[7]=b[9]; b[9]=b[3]; b[3]=b[1]; b[1]=t;
-		t=b[8]; b[8]=b[6]; b[6]=b[2]; b[2]=b[4]; b[4]=t;
+// Repaint every tile from the current cube state (centres keep their fixed-centre class).
+function paste() {
+  for (const letter of Object.keys(FACES)) {
+    const face = FACES[letter];
+    const id = letter.toUpperCase();
+    for (let i = 1; i <= 9; i++) {
+      document.getElementById(id + i).className = (i === 5 ? 'button center ' : 'button ') + face[i];
+    }
+  }
 }
 
-var U = function()
-{
-	original = original + 'U';
-
-	var t=g[1]; g[1]=y[9]; y[9]=b[7]; b[7]=w[1]; w[1]=t;
-		t=g[4]; g[4]=y[8]; y[8]=b[4]; b[4]=w[2]; w[2]=t;
-		t=g[7]; g[7]=y[7]; y[7]=b[1]; b[1]=w[3]; w[3]=t;
-		t=r[1]; r[1]=r[3]; r[3]=r[9]; r[9]=r[7]; r[7]=t;
-		t=r[6]; r[6]=r[8]; r[8]=r[4]; r[4]=r[2]; r[2]=t;
+// A move button on the move pad turns the cube and repaints (reuses TURNS).
+function Mclick(click_id) {
+  const move = TURNS[click_id[1]];
+  if (move) { move(); paste(); }
 }
 
-var D = function()
-{
-	original = original + 'D';
-
-	var t=b[9]; b[9]=y[3]; y[3]=g[3]; g[3]=w[7]; w[7]=t;
-		t=b[6]; b[6]=y[2]; y[2]=g[6]; g[6]=w[8]; w[8]=t;
-		t=b[3]; b[3]=y[1]; y[1]=g[9]; g[9]=w[9]; w[9]=t;
-		t=o[7]; o[7]=o[9]; o[9]=o[3]; o[3]=o[1]; o[1]=t;
-		t=o[4]; o[4]=o[8]; o[8]=o[6]; o[6]=o[2]; o[2]=t;
+// Apply 100 random turns to a solved cube.
+function Scramble() {
+  document.getElementById('text').innerText = '';
+  setSolved();
+  const moves = [B, U, F, D, R, L, Rs, Ls, Fs, Us, Bs, Ds];
+  for (let i = 0; i < 100; i++) moves[Math.floor(Math.random() * 12)]();
+  paste();
 }
 
-var Fs = function(){ F(); F(); F(); }
-var Bs = function(){ B(); B(); B(); }
-var Rs = function(){ R(); R(); R(); }
-var Ls = function(){ L(); L(); L(); }
-var Us = function(){ U(); U(); U(); }
-var Ds = function(){ D(); D(); D(); }
-
-var X = function()
-{
-	R(); Ls();
-
-	var t=o[5]; o[5]=y[5]; y[5]=r[5]; r[5]=w[5]; w[5]=t;
-		t=o[2]; o[2]=y[2]; y[2]=r[8]; r[8]=w[2]; w[2]=t;
-		t=o[8]; o[8]=y[8]; y[8]=r[2]; r[2]=w[8]; w[8]=t;
+function SolvedState() {
+  document.getElementById('text').innerText = '';
+  setSolved();
+  paste();
 }
 
-var Y = function()
-{
-	U(); Ds();
-
-	var t=g[5]; g[5]=y[5]; y[5]=b[5]; b[5]=w[5]; w[5]=t;
-		t=g[2]; g[2]=y[6]; y[6]=b[8]; b[8]=w[4]; w[4]=t;
-		t=g[8]; g[8]=y[4]; y[4]=b[2]; b[2]=w[6]; w[6]=t;
+function help() {
+  const s = '   ';
+  const S = '                      ';
+  let A = '\n';
+  A += S + 'R7 R8 R9\n' + S + 'R4 R5 R6\n' + S + 'R1 R2 R3\n\n';
+  A += s + 'B7 B4 B1' + s + 'W1 W2 W3' + s + 'G1 G4 G7\n';
+  A += s + 'B8 B5 B2' + s + 'W4 W5 W6' + s + 'G2 G5 G8\n';
+  A += s + 'B9 B6 B3' + s + 'W7 W8 W9' + s + 'G3 G6 G9\n\n';
+  A += S + 'O1 O2 O3\n' + S + 'O4 O5 O6\n' + S + 'O7 O8 O9\n\n';
+  A += S + 'Y1 Y2 Y3\n' + S + 'Y4 Y5 Y6\n' + S + 'Y7 Y8 Y9\n\n';
+  A += 'HOLD THE CUBE WITH THE WHITE CENTER FACING YOU, RED CENTER POINTING UP AND GREEN CENTER POINTING RIGHT AS SHOWN ABOVE AND IN THE IMAGE\n\n';
+  A += 'NOW ENTER THE THE FACE VALUE ( R / B / W / G / O / Y) ONLY\n\n';
+  A += 'ENTER STARTING FROM R1 TO R9 THEN B1 TO B9 THEN W1 TO W9 THEN G1 TO G9 THEN O1 TO O9 THEN Y1 TO Y9 RESPECTIVELY';
+  alert(A);
 }
-
-function f2l_rb()
-{
-	if(w[1]=='W' && r[1]=='R' && r[4]=='R' && b[1]=='B' && b[4]=='B')
-	return 1;
-	else 
-	return 0; 
-}
-
-function f2l_rg()
-{
-	if(w[3]=='W' && r[3]=='R' && r[6]=='R' && g[1]=='G' && g[4]=='G')
-	return 1;
-	else 
-	return 0; 
-}
-
-function f2l_bo()
-{
-	if(w[7]=='W' && o[1]=='O' && o[4]=='O' && b[3]=='B' && b[6]=='B')
-	return 1;
-	else 
-	return 0; 
-}
-
-function f2l_go()
-{
-	if(w[9]=='W' && g[3]=='G' && g[6]=='G' && o[3]=='O' && o[6]=='O')
-	return 1;
-	else 
-	return 0; 
-}
-
-function rby()
-{
-	s=r[7]+b[7]+y[7];
-	
-	if( s.search('R')!=-1  && s.search('B')!=-1  && s.search('Y')!=-1)
-	return 1;
-	else 
-	return 0;
-}
-
-function rgy()
-{
-	s=r[9]+g[7]+y[9];
-	
-	if( s.search('R')!=-1  && s.search('G')!=-1  && s.search('Y')!=-1)
-	return 1;
-	else 
-	return 0;
-}
-
-function ogy()
-{
-	s=o[9]+g[9]+y[3];
-	
-	if( s.search('O')!=-1  && s.search('G')!=-1  && s.search('Y')!=-1)
-	return 1;
-	else 
-	return 0;
-}
-
-function oby()
-{
-	s=o[7]+b[9]+y[1];
-	
-	if( s.search('O')!=-1  && s.search('B')!=-1  && s.search('Y')!=-1)
-	return 1;
-	else 
-	return 0;
-}
-
-///////////////////////////////////////////////////////////////////////////
-
-var recompress = function()
-{
-	var temp ="";
-
-	while(temp!=minimum)
-	{
-		temp=minimum;
-		original="";
-		final="";
-		
-		for(var i=0;i<minimum.length;i++)
-		{
-			if(minimum[i]>'a')
-			{
-				original = original + minimum[i].toUpperCase() + minimum[i].toUpperCase() + minimum[i].toUpperCase();
-			}
-			else
-			{
-				original = original + minimum[i];
-			}
-		}
-		compress();
-		minimum=final;
-	}
-}
-
-var transform = function()
-{
-	var v2="";
-	for(var i=minimum.length-1;i>=0;i--)
-	{
-		if(minimum[i]=='X')
-		{
-			for(var j=i+1;j<minimum.length;j++)
-			{
-				if(minimum[j]=='U')
-				{
-					minimum = setCharAt(minimum,j,'F');
-				}
-				
-				else if(minimum[j]=='D')
-				{
-					minimum = setCharAt(minimum,j,'B');
-				}
-				
-				else if(minimum[j]=='F')
-				{
-					minimum = setCharAt(minimum,j,'D');
-				}
-				
-				else if(minimum[j]=='B')
-				{
-					minimum = setCharAt(minimum,j,'U');
-				}
-				
-				else if(minimum[j]=='u')
-				{
-					minimum = setCharAt(minimum,j,'f');
-				}
-				
-				else if(minimum[j]=='d')
-				{
-					minimum = setCharAt(minimum,j,'b');
-				}
-				
-				else if(minimum[j]=='f')
-				{
-					minimum = setCharAt(minimum,j,'d');
-				}
-				
-				else if(minimum[j]=='b')
-				{
-					minimum = setCharAt(minimum,j,'u');
-				}
-			}
-		}
-		
-		else if(minimum[i]=='Y')
-		{
-			for(var j=i+1;j<minimum.length;j++)
-			{
-				if(minimum[j]=='R')
-				{
-					minimum = setCharAt(minimum,j,'B');
-				}
-				
-				else if(minimum[j]=='L')
-				{
-					minimum = setCharAt(minimum,j,'F');
-				}
-				
-				else if(minimum[j]=='F')
-				{
-					minimum = setCharAt(minimum,j,'R');
-				}
-				
-				else if(minimum[j]=='B')
-				{
-					minimum = setCharAt(minimum,j,'L');
-				}
-				
-				else if(minimum[j]=='r')
-				{
-					minimum = setCharAt(minimum,j,'b');
-				}
-				
-				else if(minimum[j]=='l')
-				{
-					minimum = setCharAt(minimum,j,'f');
-				}
-				
-				else if(minimum[j]=='f')
-				{
-					minimum = setCharAt(minimum,j,'r');
-				}
-				
-				else if(minimum[j]=='b')
-				{
-					minimum = setCharAt(minimum,j,'l');
-				}
-			}
-		}
-	}
-	
-	v2 = minimum;
-	
-	minimum="";
-	
-	for(var i=0;i<v2.length;i++)
-	{
-		if(v2[i]!='X' && v2[i]!='Y')
-		{
-			minimum = minimum + v2[i];
-		}
-	}
-
-	if(minimum.length<90)
-	{
-		recompress();
-	}
-}
-
-function check_white_cross()
-{
-	if(	  w[2]=='W' && w[4]=='W'  && w[6]=='W'  && w[8]=='W'  && r[2]=='R' && g[2]=='G' &&  o[2]=='O'  &&  b[2]=='B' )
-	{
-		return 1;
-	}
-	else
-	return 0;
-}
-
-function check_white_face()
-{
-	if(w[1]=='W'&&w[3]=='W'&&w[7]=='W' && w[9]=='W' && r[1]=='R' && r[3]=='R' && g[1]=='G' && g[3]=='G' && b[1]=='B' && b[3]=='B' && o[1]=='O' && o[3]=='O' && check_white_cross()==1)	
-	{
-		return 1;
-	}
-	else
-	return 0;
-}
-
-function check_layer2()
-{
-	if( check_white_face()==1 && r[4]=='R' && r[6]=='R' && g[4]=='G' && g[6]=='G' && o[4]=='O' && o[6]=='O' && b[4]=='B' && b[6]=='B'  )
-	{
-		return 1;
-	}
-	else
-	return 0;
-}
-
-function check_yellow_cross()
-{
-	if( check_layer2()==1 && y[2]=='Y' && y[4]=='Y' && y[6]=='Y' && y[8]=='Y' )
-	{
-		return 1;
-	}
-	else
-	return 0;
-}
-
-function check_ORyellow_cross()
-{
-	if( check_yellow_cross()==1 && r[8]=='R' && o[8]=='O' && g[8]=='G' && b[8]=='B' )
-	{
-		return 1;
-	}
-	else
-	return 0;
-}
-
-function check_corner()
-{
-	if( check_ORyellow_cross() && rby() && rgy() && ogy() && oby() )
-	{
-		return 1;
-	}
-	else
-	return 0;
-}
-
-function check_if_solved()
-{	
-	for(var i=1;i<=9;i++)
-	{
-		if  ( ! (r[i]=='R' && w[i]=='W' &&  o[i]=='O' &&  y[i]=='Y'  &&  b[i]=='B' &&  g[i]=='G') )
-		{
-			return 0;
-		}
-	}	
-	return 1;
-}
-
-var solve = function()
-{
-	BRsolve: 
-	{
-		while(minimum.length<200)
-		minimum=minimum+'a';
-
-		for(var i=1;i<=9;i++)
-		{
-			rx[i]=r[i];
-			bx[i]=b[i];
-			wx[i]=w[i];
-			gx[i]=g[i];
-			ox[i]=o[i];
-			yx[i]=y[i];
-		}
-		
-		for(var i=0;i<=23;i++)
-		{
-			for(var j=0;j<=23;j++)
-			{		
-				original="";
-				final="";
-
-				for(var s=1;s<=9;s++)
-				{
-					r[s]=rx[s];
-					b[s]=bx[s];
-					w[s]=wx[s];
-					g[s]=gx[s];
-					o[s]=ox[s];
-					y[s]=yx[s];
-				}
-				
-				x=fact(i);
-				ix[4]=x%10;
-				x=Math.floor(x/10);
-				ix[3]=x%10;
-				x=Math.floor(x/10);
-				ix[2]=x%10;
-				x=Math.floor(x/10);
-				ix[1]=x%10;
-				
-				x=fact(j);
-				jx[4]=x%10;
-				x=Math.floor(x/10);
-				jx[3]=x%10;
-				x=Math.floor(x/10);
-				jx[2]=x%10;
-				x=Math.floor(x/10);
-				jx[1]=x%10;
-				
-				//////////////////////////////// WHITE CROSS		use I
-				
-				while(check_white_cross()==0)
-				{
-					var d = new Date();
-					var now = d.getTime();
-					if(now-startT>maxTime)
-					{
-						for(var s=1;s<=9;s++)
-						{
-							r[s]=ro[s];
-							b[s]=bo[s];
-							w[s]=wo[s];
-							g[s]=go[s];
-							o[s]=oo[s];
-							y[s]=yo[s];
-						}
-						alert("Invalid configuration")
-						Invalid = true;
-						break BRsolve;
-					}
-
-					goWC(ix[1]);
-					goWC(ix[2]);
-					goWC(ix[3]);
-					goWC(ix[4]);
-				}
-					
-				///////////////////////////////  WHITE FACE FULL	use j
-				
-				while(check_layer2()==0)
-				{
-					var d = new Date();
-					var now = d.getTime();
-					if(now-startT>maxTime)
-					{
-						for(var s=1;s<=9;s++)
-						{
-							r[s]=ro[s];
-							b[s]=bo[s];
-							w[s]=wo[s];
-							g[s]=go[s];
-							o[s]=oo[s];
-							y[s]=yo[s];
-						}
-						alert("Invalid configuration")
-						Invalid = true;
-						break BRsolve;
-					}
-
-					goL2(jx[1]);
-					goL2(jx[2]);
-					goL2(jx[3]);
-					goL2(jx[4]);
-				}
-				
-				
-				///////////////////////////////  YELLOW CROSS
-
-				while(check_yellow_cross()==0)
-				{
-					var d = new Date();
-					var now = d.getTime();
-					if(now-startT>maxTime)
-					{
-						for(var s=1;s<=9;s++)
-						{
-							r[s]=ro[s];
-							b[s]=bo[s];
-							w[s]=wo[s];
-							g[s]=go[s];
-							o[s]=oo[s];
-							y[s]=yo[s];
-						}
-						alert("Invalid configuration")
-						Invalid = true;
-						break BRsolve;
-					}
-					
-					if(  ( y[8]=='Y' && y[6]=='Y' && y[2]!='Y' && y[4]!='Y' )  ||   (y[2]!='Y' && y[4]!='Y' && y[6]!='Y' && y[8]!='Y')   ||   (  y[4]=='Y' && y[6]=='Y' && y[2]!='Y' && y[8]!='Y' )   )
-					{
-						U(); R(); B(); Rs(); Bs(); Us();
-					}
-					
-					else if(   ( y[8]=='Y' && y[4]=='Y' && y[2]!='Y' && y[6]!='Y' )  ||   (y[2]=='Y' && y[8]=='Y' && y[4]!='Y' && y[6]!='Y')   )
-					{
-						L(); U(); B(); Us(); Bs(); Ls();
-					}
-					
-					else if( y[4]=='Y' && y[2]=='Y' && y[8]!='Y' && y[6]!='Y' )
-					{
-						D(); L(); B(); Ls(); Bs(); Ds();
-					}
-					
-					else if( y[6]=='Y' && y[2]=='Y' && y[4]!='Y' && y[8]!='Y' )
-					{
-						R(); D(); B(); Ds(); Bs(); Rs();
-					}
-					
-				}
-
-
-				////////////////////////////////  ORIENTED YELLOW CROSS
-				
-				while(check_ORyellow_cross()==0)
-				{
-					var d = new Date();
-					var now = d.getTime();
-					if(now-startT>maxTime)
-					{
-						for(var s=1;s<=9;s++)
-						{
-							r[s]=ro[s];
-							b[s]=bo[s];
-							w[s]=wo[s];
-							g[s]=go[s];
-							o[s]=oo[s];
-							y[s]=yo[s];
-						}
-						alert("Invalid configuration")
-						Invalid = true;
-						break BRsolve;
-					}
-
-					while  ( !( ( r[8]=='R' && b[8]=='B' ) || ( r[8]=='R' && g[8]=='G' ) || ( r[8]=='R' && o[8]=='O' ) || ( b[8]=='B' && g[8]=='G' ) || ( b[8]=='B' && o[8]=='O' ) || ( g[8]=='G' && o[8]=='O' ) ))
-					{
-						B();
-					}
-					
-					if(  g[8]=='G' && o[8]=='O' )
-					{
-						U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Bs();
-					}
-					else if( b[8]=='B' && o[8]=='O' )
-					{
-						R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Bs();
-					}
-					else if( b[8]=='B' && g[8]=='G'  )
-					{
-						U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Bs(); L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Bs();
-					}
-					else if(  r[8]=='R' && o[8]=='O' )
-					{
-						L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Bs(); D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Bs();
-					}
-					else if(   r[8]=='R' && g[8]=='G' )
-					{
-						L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Bs();
-					}
-					else if( r[8]=='R' && b[8]=='B' )
-					{
-						D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Bs();
-					}
-				}
-				
-				
-				////////////////////////////////  ORIENTED CORNERS
-				
-				
-				while(check_corner()==0)
-				{
-					var d = new Date();
-					var now = d.getTime();
-					if(now-startT>maxTime)
-					{
-						for(var s=1;s<=9;s++)
-						{
-							r[s]=ro[s];
-							b[s]=bo[s];
-							w[s]=wo[s];
-							g[s]=go[s];
-							o[s]=oo[s];
-							y[s]=yo[s];
-						}
-						alert("Invalid configuration")
-						Invalid = true;
-						break BRsolve;
-					}
-
-					if(rby())
-					{
-						if( (r[9]=='B' && g[7]=='Y' && y[9]=='O') || (r[9]=='O' && g[7]=='B' && y[9]=='Y') || (r[9]=='Y' && g[7]=='O' && y[9]=='B') )
-						{
-							Ds(); B(); U(); Bs(); D(); B(); Us(); Bs();
-						}
-						else 
-						{
-							B(); U(); Bs(); Ds(); B(); Us(); Bs(); D();
-						}
-					}
-					else if(oby())
-					{
-						if( (r[9]=='R' && g[7]=='Y' && y[9]=='B') || (r[9]=='B' && g[7]=='R' && y[9]=='Y') || (r[9]=='Y' && g[7]=='B' && y[9]=='R') )
-						{
-							Rs(); B(); L(); Bs(); R(); B(); Ls(); Bs();
-						}
-						else
-						{
-							B(); L(); Bs(); Rs(); B(); Ls(); Bs(); R();
-						}
-						
-					}
-					
-					else if(ogy())
-					{
-						if( (r[9]=='R' && g[7]=='Y' && y[9]=='B') || (r[9]=='B' && g[7]=='R' && y[9]=='Y') || (r[9]=='Y' && g[7]=='B' && y[9]=='R') )
-						{
-							Us(); B(); D(); Bs(); U(); B(); Ds(); Bs();
-						}
-						else
-						{
-							B(); D(); Bs(); Us(); B(); Ds(); Bs(); U();
-						}
-						
-					}
-					
-					else
-					{
-						if( (r[1]=='Y' && b[7]=='B' && y[7]=='O') || (r[9]=='O' && g[7]=='Y' && y[9]=='B') || (r[9]=='B' && g[7]=='O' && y[9]=='Y') )
-						{
-							Ls(); B(); R(); Bs(); L(); B(); Rs(); Bs();
-						}
-						else
-						{
-							B(); R(); Bs(); Ls(); B(); Rs(); Bs(); L();
-						}
-						
-					}
-				}
-				
-				
-				////////////////////////////////  COMPLETE CUBE
-				
-				while(check_if_solved()==0)
-				{
-					//////////////////////		2 ADJ
-					
-					// R
-
-					var d = new Date();
-					var now = d.getTime();
-					if(now-startT>maxTime)
-					{
-						for(var s=1;s<=9;s++)
-						{
-							r[s]=ro[s];
-							b[s]=bo[s];
-							w[s]=wo[s];
-							g[s]=go[s];
-							o[s]=oo[s];
-							y[s]=yo[s];
-						}
-						alert("Invalid configuration")
-						Invalid = true;
-						break BRsolve;
-					}
-					
-					if(y[1]=='Y' && y[3]=='Y')
-					{
-						if(r[7]=='Y' && r[9]=='Y')
-						{
-							U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Ds(); B(); B(); D(); B(); Ds(); B(); D();
-						}
-						
-						else
-						{
-							Ds(); Bs(); D(); Bs(); Ds(); B(); B(); D(); U(); B(); Us(); B(); U(); B(); B(); Us();
-						}	
-					}
-					
-					// B
-					
-					else if(y[3]=='Y' && y[9]=='Y')
-					{
-						if(b[7]=='Y' && b[9]=='Y')
-						{
-							L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Rs(); B(); B(); R(); B(); Rs(); B(); R();
-						}
-						else
-						{
-							Rs(); Bs(); R(); Bs(); Rs(); B(); B(); R(); L(); B(); Ls(); B(); L(); B(); B(); Ls();
-						}
-					}
-					
-					// O
-					
-					else if(y[7]=='Y' && y[9]=='Y')
-					{
-						if(o[7]=='Y' && o[9]=='Y')
-						{
-							D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Us(); B(); B(); U(); B(); Us(); B(); U();
-						}
-						else
-						{
-							Us(); Bs(); U(); Bs(); Us(); B(); B(); U(); D(); B(); Ds(); B(); D(); B(); B(); Ds();
-						}
-					}
-					
-					// G
-					
-					else if(y[1]=='Y' && y[7]=='Y')
-					{
-						if(g[7]=='Y' && g[9]=='Y')
-						{
-							R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
-						}
-						else
-						{
-							Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
-						}
-					}
-					
-					///////////////////////////		2 DIAG
-					
-					else if(y[1]=='Y' && y[9]=='Y')
-					{
-						if(r[7]=='Y' && g[9]=='Y')
-						{
-							U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Ds(); B(); B(); D(); B(); Ds(); B(); D();
-							R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
-						}
-						else 
-						{
-							Ds(); Bs(); D(); Bs(); Ds(); B(); B(); D(); U(); B(); Us(); B(); U(); B(); B(); Us();
-							Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
-						}	
-					}
-					
-					else if(y[3]=='Y' && y[7]=='Y')
-					{
-						if(g[7]=='Y' && o[7]=='Y')
-						{
-							R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
-							D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Us(); B(); B(); U(); B(); Us(); B(); U();
-						}
-						else
-						{
-							Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
-							Us(); Bs(); U(); Bs(); Us(); B(); B(); U(); D(); B(); Ds(); B(); D(); B(); B(); Ds();
-						}
-					}
-					
-					/////////////////////////////		3 Y up
-					
-					
-					else if(y[1]=='Y')
-					{
-						if(r[7]=='Y' && g[7]=='G' && o[9]=='Y')
-						{
-							U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Ds(); B(); B(); D(); B(); Ds(); B(); D();
-							Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
-						}
-						else
-						{
-							Ds(); Bs(); D(); Bs(); Ds(); B(); B(); D(); U(); B(); Us(); B(); U(); B(); B(); Us();
-							R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
-						}
-					}
-					
-					else if(y[3]=='Y')
-					{
-						if(b[9]=='Y' && r[7]=='Y' && g[7]=='Y')
-						{
-							L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Rs(); B(); B(); R(); B(); Rs(); B(); R();
-							Ds(); Bs(); D(); Bs(); Ds(); B(); B(); D(); U(); B(); Us(); B(); U(); B(); B(); Us();
-						}
-						else
-						{
-							Rs(); Bs(); R(); Bs(); Rs(); B(); B(); R(); L(); B(); Ls(); B(); L(); B(); B(); Ls();
-							U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Ds(); B(); B(); D(); B(); Ds(); B(); D();
-						}
-					}
-					
-					else if(y[7]=='Y')
-					{
-						if(g[7]=='Y' && o[9]=='Y' && b[9]=='Y')
-						{
-							R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
-							Us(); Bs(); U(); Bs(); Us(); B(); B(); U(); D(); B(); Ds(); B(); D(); B(); B(); Ds();
-						}
-						else
-						{
-							Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
-							D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Us(); B(); B(); U(); B(); Us(); B(); U();
-						}
-					}
-					
-					else if(y[9]=='Y')
-					{
-						if(r[7]=='Y' && b[9]=='Y' && o[9]=='Y')
-						{
-							D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Us(); B(); B(); U(); B(); Us(); B(); U();
-							Rs(); Bs(); R(); Bs(); Rs(); B(); B(); R(); L(); B(); Ls(); B(); L(); B(); B(); Ls();
-						}
-						else
-						{
-							Us(); Bs(); U(); Bs(); Us(); B(); B(); U(); D(); B(); Ds(); B(); D(); B(); B(); Ds();
-							L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Rs(); B(); B(); R(); B(); Rs(); B(); R();
-						}
-					}
-					
-					/////////////////////////////		all 4 messed up
-					
-					
-					// R
-					
-					else if(r[7]=='Y' && r[9]=='Y')
-					{
-						U(); B(); B(); Us(); Bs(); U(); Bs(); Us(); Ds(); B(); B(); D(); B(); Ds(); B(); D();
-					}
-						
-					else if(b[7]=='Y' && g[7]=='Y')
-					{
-						Ds(); Bs(); D(); Bs(); Ds(); B(); B(); D(); U(); B(); Us(); B(); U(); B(); B(); Us();
-					}
-					
-					// B
-					
-					else if(b[7]=='Y' && b[9]=='Y')
-					{
-						L(); B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Rs(); B(); B(); R(); B(); Rs(); B(); R();
-					}
-					
-					else if(b[7]=='R' && b[9]=='O')
-					{
-						Rs(); Bs(); R(); Bs(); Rs(); B(); B(); R(); L(); B(); Ls(); B(); L(); B(); B(); Ls();
-					}
-					
-					// O
-					
-					else if(o[7]=='Y' && o[9]=='Y')
-					{
-						D(); B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Us(); B(); B(); U(); B(); Us(); B(); U();
-					}
-					else if(o[7]=='B' && o[9]=='G')
-					{
-						Us(); Bs(); U(); Bs(); Us(); B(); B(); U(); D(); B(); Ds(); B(); D(); B(); B(); Ds();
-					}
-					
-					// G
-					
-					else if(g[7]=='Y' && g[9]=='Y')
-					{
-						R(); B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Ls(); B(); B(); L(); B(); Ls(); B(); L();
-					}
-					else if(g[7]=='R' && g[9]=='O')
-					{
-						Ls(); Bs(); L(); Bs(); Ls(); B(); B(); L(); R(); B(); Rs(); B(); R(); B(); B(); Rs();
-					}	
-				}
-
-				compress();
-				
-				if(minimum.length>final.length)
-				{
-					minimum=final;	
-				}
-			}
-		}
-	}
-}
-
-var Ocenter = function()
-{
-	for(var i=1;i<=9;i++)
-	{
-		if(w[i]=='W')
-		w[i]='R';
-		else if(w[i]=='R')
-		w[i]='Y';
-		else if(w[i]=='Y')
-		w[i]='O';
-		else if(w[i]=='O')
-		w[i]='W';
-		
-		if(r[i]=='W')
-		r[i]='R';
-		else if(r[i]=='R')
-		r[i]='Y';
-		else if(r[i]=='Y')
-		r[i]='O';
-		else if(r[i]=='O')
-		r[i]='W';
-		
-		if(b[i]=='W')
-		b[i]='R';
-		else if(b[i]=='R')
-		b[i]='Y';
-		else if(b[i]=='Y')
-		b[i]='O';
-		else if(b[i]=='O')
-		b[i]='W';
-		
-		if(g[i]=='W')
-		g[i]='R';
-		else if(g[i]=='R')
-		g[i]='Y';
-		else if(g[i]=='Y')
-		g[i]='O';
-		else if(g[i]=='O')
-		g[i]='W';
-		
-		if(o[i]=='W')
-		o[i]='R';
-		else if(o[i]=='R')
-		o[i]='Y';
-		else if(o[i]=='Y')
-		o[i]='O';
-		else if(o[i]=='O')
-		o[i]='W';
-		
-		if(y[i]=='W')
-		y[i]='R';
-		else if(y[i]=='R')
-		y[i]='Y';
-		else if(y[i]=='Y')
-		y[i]='O';
-		else if(y[i]=='O')
-		y[i]='W';		
-	}
-	X();
-}
-
-var Ycenter = function()
-{
-	Ocenter();
-	Ocenter();
-}
-
-var Rcenter = function()
-{
-	Ocenter();
-	Ocenter();
-	Ocenter();
-}
-
-var Gcenter = function()
-{
-	for(var i=1;i<=9;i++)
-	{
-		if(w[i]=='W')
-		w[i]='B';
-		else if(w[i]=='B')
-		w[i]='Y';
-		else if(w[i]=='Y')
-		w[i]='G';
-		else if(w[i]=='G')
-		w[i]='W';
-		
-		if(r[i]=='W')
-		r[i]='B';
-		else if(r[i]=='B')
-		r[i]='Y';
-		else if(r[i]=='Y')
-		r[i]='G';
-		else if(r[i]=='G')
-		r[i]='W';
-		
-		if(b[i]=='W')
-		b[i]='B';
-		else if(b[i]=='B')
-		b[i]='Y';
-		else if(b[i]=='Y')
-		b[i]='G';
-		else if(b[i]=='G')
-		b[i]='W';
-		
-		if(g[i]=='W')
-		g[i]='B';
-		else if(g[i]=='B')
-		g[i]='Y';
-		else if(g[i]=='Y')
-		g[i]='G';
-		else if(g[i]=='G')
-		g[i]='W';
-		
-		if(o[i]=='W')
-		o[i]='B';
-		else if(o[i]=='B')
-		o[i]='Y';
-		else if(o[i]=='Y')
-		o[i]='G';
-		else if(o[i]=='G')
-		o[i]='W';
-		
-		if(y[i]=='W')
-		y[i]='B';
-		else if(y[i]=='B')
-		y[i]='Y';
-		else if(y[i]=='Y')
-		y[i]='G';
-		else if(y[i]=='G')
-		y[i]='W';
-	}
-	Y();
-}
-
-var Bcenter = function()
-{
-	Gcenter();
-	Gcenter();
-	Gcenter();
-}
-
-
-var All_Face_solve = function()
-{
-	BRallsolve:
-	{
-		s = document.getElementById("textarea").value;
-		if(s.length==54 && s.replace(/R/g,"").length==45 && s.replace(/B/g,"").length==45 && s.replace(/W/g,"").length==45 && s.replace(/G/g,"").length==45 && s.replace(/O/g,"").length==45 && s.replace(/Y/g,"").length==45 )
-		{
-			////////////////	W center
-			color=1;
-			solve();
-
-			if(Invalid==true)
-			{
-				break BRallsolve;
-			}
-
-			recompress();
-			mini=minimum;
-
-			//////////////// 	O center
-			for(var s=1;s<=9;s++)
-			{
-				r[s]=ro[s];
-				b[s]=bo[s];
-				w[s]=wo[s];
-				g[s]=go[s];
-				o[s]=oo[s];
-				y[s]=yo[s];
-			}
-			
-			Ocenter();
-			solve();
-			minimum ="X"+ minimum;
-			transform();
-			recompress();
-			
-			if(mini.length>minimum.length)
-			{
-				mini=minimum;
-				color=2;
-			}
-			
-			///////////////		Y center
-			for(var s=1;s<=9;s++)
-			{
-				r[s]=ro[s];
-				b[s]=bo[s];
-				w[s]=wo[s];
-				g[s]=go[s];
-				o[s]=oo[s];
-				y[s]=yo[s];
-			}
-			
-			Ycenter();
-			solve();
-			minimum = "XX"+ minimum;
-			transform();
-
-			recompress();
-
-			if(mini.length>minimum.length)
-			{
-				mini=minimum;
-				color=3;
-			}
-			
-			////////////////	R Center
-			
-			
-			for(var s=1;s<=9;s++)
-			{
-				r[s]=ro[s];
-				b[s]=bo[s];
-				w[s]=wo[s];
-				g[s]=go[s];
-				o[s]=oo[s];
-				y[s]=yo[s];
-			}
-			
-			Rcenter();
-			solve();
-			
-			minimum = "XXX"+ minimum;
-			transform();
-			recompress();
-
-			if(mini.length>minimum.length)
-			{
-				mini=minimum;
-				color=4;
-			}
-			
-			///////////////		G center
-			
-			for(var s=1;s<=9;s++)
-			{
-				r[s]=ro[s];
-				b[s]=bo[s];
-				w[s]=wo[s];
-				g[s]=go[s];
-				o[s]=oo[s];
-				y[s]=yo[s];
-			}
-			
-			Gcenter();
-			solve();
-
-			minimum = "Y"+ minimum;
-			transform();
-			recompress();
-			
-			if(mini.length>minimum.length)
-			{
-				mini=minimum;
-				color=5;
-			}
-			
-			///////////////		B center
-			
-			for(var s=1;s<=9;s++)
-			{
-				r[s]=ro[s];
-				b[s]=bo[s];
-				w[s]=wo[s];
-				g[s]=go[s];
-				o[s]=oo[s];
-				y[s]=yo[s];
-			}
-			
-			Bcenter();
-			solve();
-
-			minimum = "YYY"+ minimum;
-			transform();
-			recompress();
-			
-			if(mini.length>minimum.length)
-			{
-				mini=minimum;
-				color=6;
-			}
-			
-			////////////////////// END	
-			
-			minimum=mini;
-			
-			switch(color)
-			{
-				case 1:
-					col="WHITE";
-					break;
-				case 2:
-					col="ORANGE";
-					break;
-				case 3:
-					col="YELLOW";
-					break;
-				case 4:
-					col="RED";
-					break;
-				case 5:
-					col="GREEN";
-					break;
-				case 6:
-					col="BLUE";
-					break;	
-			}
-		}
-		else
-		{
-			alert("Invalid configuration");
-		}
-	}
-}
-
-function goWC(n)
-{
-	if(n==0)
-	{
-		if(	 !( w[4]=='W' && b[2]=='B' )	 )			//  BLUE WHITE	0
-		{
-			/////////// LAYER 1
-			if( w[2]=='W' && r[2]=='B')
-			{
-				U(); U(); B(); L(); L();
-			}
-			else if( w[2]=='B' && r[2]=='W')
-			{
-				U(); L();
-			}
-			//
-			else if( w[4]=='B' && b[2]=='W')
-			{
-				F(); U(); Fs(); L();
-			}
-			//
-			else if( w[6]=='W' && g[2]=='B')
-			{
-				R(); R(); B(); B(); L(); L();
-			}
-			else if( w[6]=='B' && g[2]=='W')
-			{
-				Fs(); U(); F(); L();
-			}
-			//
-			else if( w[8]=='W' && o[2]=='B')
-			{
-				F(); Ls(); Fs(); L();
-			}
-			else if( w[8]=='B' && o[2]=='W')
-			{
-				Ds(); Ls();
-			}
-			////////////////////////////layer 2
-			
-			else if( b[6]=='W' && o[4]=='B')
-			{
-				Fs(); D(); F();
-			}
-			else if( b[6]=='B' && o[4]=='W')
-			{
-				Ls();
-			}
-			//
-			else if( o[6]=='W' && g[6]=='B')
-			{
-				F(); F(); R(); F(); F();
-			}
-			else if( o[6]=='B' && g[6]=='W')
-			{
-				D(); Bs(); Ds(); L(); L();
-			}
-			//
-			else if( g[4]=='W' && r[6]=='B')
-			{
-				F(); U(); Fs();
-			}
-			else if( g[4]=='B' && r[6]=='W')
-			{
-				U(); U(); L(); U(); U();
-			}
-			//
-			else if( r[4]=='W' && b[4]=='B')
-			{
-				L();
-			}
-			else if( r[4]=='B' && b[4]=='W')
-			{
-				F(); Us(); Fs();
-			}
-			///////////////////////////////layer 3
-			
-			
-			else if( y[2]=='W' && o[8]=='B')
-			{
-				Bs(); L(); L();
-			}
-			else if( y[2]=='B' && o[8]=='W')
-			{
-				D(); Ls(); Ds();
-			}
-			//
-			else if( y[4]=='W' && b[8]=='B')
-			{
-				L(); L();
-			}
-			else if( y[4]=='B' && b[8]=='W')
-			{
-				L(); F(); Us(); Fs();
-			}
-			//
-			else if( y[6]=='W' && g[8]=='B')
-			{
-				B(); B(); L(); L();
-			}
-			else if( y[6]=='B' && g[8]=='W')
-			{
-				F(); B(); Us(); Fs(); L();
-			}
-			//
-			else if( y[8]=='W' && r[8]=='B')
-			{
-				B(); L(); L();
-			}
-			else if( y[8]=='B' && r[8]=='W')
-			{
-				Us(); L(); U();
-			}
-			//////////////////////
-		}
-		
-		
-	}
-	
-	else if(n==1)
-	{
-		if(	 !( w[2]=='W' && r[2]=='R' )	 )			// RED WHITE	1
-		{
-			/////////// LAYER 1
-			if( w[2]=='R' && r[2]=='W')
-			{
-				Fs(); Ls(); F(); Us();
-			}
-			//
-			else if( w[4]=='W' && b[2]=='R')
-			{
-				F(); U(); Fs(); Us();
-			}
-			else if( w[4]=='R' && b[2]=='W')
-			{
-				Ls(); Us();
-			}
-			//
-			else if( w[6]=='W' && g[2]=='R')
-			{
-				Fs(); U(); F(); Us();
-			}
-			else if( w[6]=='R' && g[2]=='W')
-			{
-				R(); U();
-			}
-			//
-			else if( w[8]=='W' && o[2]=='R')
-			{
-				D(); R(); R(); U(); R(); R();
-			}
-			else if( w[8]=='R' && o[2]=='W')
-			{
-				Ds(); Fs(); Ls(); F();
-			}
-			////////////////////////////layer 2
-			
-			else if( b[6]=='W' && o[4]=='R')
-			{
-				F(); F(); D(); F(); F();
-			}
-			else if( b[6]=='R' && o[4]=='W')
-			{
-				Fs(); Ls(); F();
-			}
-			//
-			else if( o[6]=='W' && g[6]=='R')
-			{
-				F(); R(); Fs();
-			}
-			else if( o[6]=='R' && g[6]=='W')
-			{
-				F(); F(); Ds(); F(); F();
-			}
-			//
-			else if( g[4]=='W' && r[6]=='R')
-			{
-				U();
-			}
-			else if( g[4]=='R' && r[6]=='W')
-			{
-				F(); Rs(); Fs();
-			}
-			//
-			else if( r[4]=='W' && b[4]=='R')
-			{
-				Fs(); L(); F();
-			}
-			else if( r[4]=='R' && b[4]=='W')
-			{
-				Us();
-			}
-			///////////////////////////////layer 3
-			
-			
-			else if( y[2]=='W' && o[8]=='R')
-			{
-				B(); B(); U(); U();
-			}
-			else if( y[2]=='R' && o[8]=='W')
-			{
-				Bs(); L(); Us(); Ls();
-			}
-			//
-			else if( y[4]=='W' && b[8]=='R')
-			{
-				Bs(); U(); U();
-			}
-			else if( y[4]=='R' && b[8]=='W')
-			{
-				L(); Us(); Ls();
-			}
-			//
-			else if( y[6]=='W' && g[8]=='R')
-			{
-				B(); U(); U(); 
-			}
-			else if( y[6]=='R' && g[8]=='W')
-			{
-				Rs(); U(); R();
-			}
-			//
-			else if( y[8]=='W' && r[8]=='R')
-			{
-				U(); U();
-			}
-			else if( y[8]=='R' && r[8]=='W')
-			{
-				Us(); Fs(); L(); F();
-			}
-			//////////////////////
-		}
-		
-	}
-	
-	else if(n==2)
-	{
-		if(	 !( w[8]=='W' && o[2]=='O' )	 )			//  ORANGE WHITE	2
-		{
-			/////////// LAYER 1
-			if( w[2]=='W' && r[2]=='O')
-			{
-				U(); U(); B(); B(); D(); D();
-			}
-			else if( w[2]=='O' && r[2]=='W')
-			{
-				U(); F(); L(); Fs();
-			}
-			//
-			else if( w[4]=='W' && b[2]=='O')
-			{
-				Ds(); Fs(); D(); F();
-			}
-			else if( w[4]=='O' && b[2]=='W')
-			{
-				L(); D();
-			}
-			//
-			else if( w[6]=='W' && g[2]=='O')
-			{
-				Rs(); Fs(); R(); F();
-			}
-			else if( w[6]=='O' && g[2]=='W')
-			{
-				Rs(); Ds();
-			}
-			//
-			else if( w[8]=='O' && o[2]=='W')
-			{
-				D(); Fs(); R(); F();
-			}
-			////////////////////////////layer 2
-			
-			else if( b[6]=='W' && o[4]=='O')
-			{
-				D();
-			}
-			else if( b[6]=='O' && o[4]=='W')
-			{
-				F(); Ls(); Fs();
-			}
-			//
-			else if( o[6]=='W' && g[6]=='O')
-			{
-				Fs(); R(); F();
-			}
-			else if( o[6]=='O' && g[6]=='W')
-			{
-				Ds();
-			}
-			//
-			else if( g[4]=='W' && r[6]=='O')
-			{
-				R(); R(); Ds(); R(); R(); 
-			}
-			else if( g[4]=='O' && r[6]=='W')
-			{
-				Fs(); Rs(); F();
-			}
-			//
-			else if( r[4]=='W' && b[4]=='O')
-			{
-				F(); L(); Fs();
-			}
-			else if( r[4]=='O' && b[4]=='W')
-			{
-				F(); F(); Us(); F(); F();
-			}
-			///////////////////////////////layer 3
-			
-			
-			else if( y[2]=='W' && o[8]=='O')
-			{
-				D(); D();
-			}
-			else if( y[2]=='O' && o[8]=='W')
-			{
-				Ds(); Fs(); R(); F();
-			}
-			//
-			else if( y[4]=='W' && b[8]=='O')
-			{
-				B(); D(); D(); 
-			}
-			else if( y[4]=='O' && b[8]=='W')
-			{
-				Ls(); D(); L();
-			}
-			//
-			else if( y[6]=='W' && g[8]=='O')
-			{
-				Bs(); D(); D(); 
-			}
-			else if( y[6]=='O' && g[8]=='W')
-			{
-				R(); Ds(); Rs();
-			}
-			//
-			else if( y[8]=='W' && r[8]=='O')
-			{
-				B(); B(); D(); D();
-			}
-			else if( y[8]=='O' && r[8]=='W')
-			{
-				B(); Ls(); D(); L();
-			}
-			//////////////////////
-		}
-		
-	}
-	
-	else if(n==3)
-	{
-		if(	 !( w[6]=='W' && g[2]=='G' )	 )			//  GREEN WHITE		3
-		{
-			/////////// LAYER 1
-			if( w[2]=='W' && r[2]=='G')
-			{
-				F(); R(); Fs(); Rs();
-			}
-			else if( w[2]=='G' && r[2]=='W')
-			{
-				Us(); Rs();
-			}
-			//
-			else if( w[4]=='W' && b[2]=='G')
-			{
-				L(); L(); B(); B(); R(); R();
-			}
-			else if( w[4]=='G' && b[2]=='W')
-			{
-				Ls(); Fs(); Us(); F();
-			}
-			//
-			else if( w[6]=='G' && g[2]=='W')
-			{
-				R(); Fs(); U(); F();
-			}
-			//
-			else if( w[8]=='W' && o[2]=='G')
-			{
-				Fs(); R(); F(); Rs();
-			}
-			else if( w[8]=='G' && o[2]=='W')
-			{
-				D(); R();
-			}
-			////////////////////////////layer 2
-			
-			else if( b[6]=='W' && o[4]=='G')
-			{
-				F(); D(); Fs();
-			}
-			else if( b[6]=='G' && o[4]=='W')
-			{
-				D(); D(); R(); D(); D();
-			}
-			//
-			else if( o[6]=='W' && g[6]=='G')
-			{
-				R();
-			}
-			else if( o[6]=='G' && g[6]=='W')
-			{
-				F(); Ds(); Fs();
-			}
-			//
-			else if( g[4]=='W' && r[6]=='G')
-			{
-				Fs(); U(); F();
-			}
-			else if( g[4]=='G' && r[6]=='W')
-			{
-				Rs();
-			}
-			//
-			else if( r[4]=='W' && b[4]=='G')
-			{
-				U(); U(); Rs(); U(); U(); 
-			}
-			else if( r[4]=='G' && b[4]=='W')
-			{
-				Fs(); Us(); F();
-			}
-			///////////////////////////////layer 3
-			
-			
-			else if( y[2]=='W' && o[8]=='G')
-			{
-				B(); R(); R();
-			}
-			else if( y[2]=='G' && o[8]=='W')
-			{
-				Ds(); R(); D();
-			}
-			//
-			else if( y[4]=='W' && b[8]=='G')
-			{
-				B(); B(); R(); R();
-			}
-			else if( y[4]=='G' && b[8]=='W')
-			{
-				B(); Ds(); R(); D();
-			}
-			//
-			else if( y[6]=='W' && g[8]=='G')
-			{
-				R(); R(); 
-			}
-			else if( y[6]=='G' && g[8]=='W')
-			{
-				Rs(); Fs(); U(); F();
-			}
-			//
-			else if( y[8]=='W' && r[8]=='G')
-			{
-				Bs(); R(); R();
-			}
-			else if( y[8]=='G' && r[8]=='W')
-			{
-				U(); Rs(); Us();
-			}
-			//////////////////////
-		}			
-		
-	}
-	
-}
-
-function goL2(n)
-{
-	if(n==0)
-	{	//BR	
-		p1:
-		{					
-			if(f2l_rb()==0)	// RB F2L
-			{
-				//////////////////  FIRST TO THIRD
-				
-				if(	 (w[1]=='W' && r[1]=='R' && b[1]=='B') ||	(w[1]=='B' && r[1]=='W' && b[1]=='R') || (w[1]=='R' && r[1]=='B' && b[1]=='W')	)
-				{
-					Ls(); Bs(); L();
-				}
-				
-				else if(  (w[3]=='W' && r[3]=='B' && g[1]=='R') || (w[3]=='R' && r[3]=='W' && g[1]=='B') || (w[3]=='B' && r[3]=='R' && g[1]=='W')  )
-				{
-					R(); Bs(); Rs();
-				}
-				
-				else if(	(w[9]=='W' && g[3]=='B' && o[3]=='R') || (w[9]=='R' && g[3]=='W' && o[3]=='B') || (w[9]=='B' && g[3]=='R' && o[3]=='W')   )
-				{
-					Rs(); Bs(); R();
-				}
-				
-				else if(	(w[7]=='W' && b[3]=='R' && o[1]=='B') || (w[7]=='B' && b[3]=='W' && o[1]=='R') || (w[7]=='R' && b[3]=='B' && o[1]=='W')   )
-				{
-					L(); Bs(); Ls();
-				}
-				
-				//////////////////  SECOND TO THIRD
-				
-				if( (r[4]=='R' && b[4]=='B') || (r[4]=='B' && b[4]=='R') )		//BR
-				{
-					if(	(r[7]=='R' && b[7]=='W' && y[7]=='B')  || (r[7]=='B' && b[7]=='R' && y[7]=='W')  || (r[7]=='W' && b[7]=='B' && y[7]=='R') )
-					{
-						U(); Bs(); Us();
-					}
-					else
-					{
-						U(); B(); Us();
-					}
-				}
-				
-				else if( ( r[6]=='R' && g[4]=='B' )  || ( r[6]=='B' && g[4]=='R' )  )		//RG
-				{
-					if( ( r[9]=='W' && g[7]=='R' && y[9]=='B' ) || ( r[9]=='B' && g[7]=='W' && y[9]=='R' ) || ( r[9]=='R' && g[7]=='B' && y[9]=='W' )  )
-					{
-						R(); Bs(); Rs();
-					}
-					else
-					{
-						R(); B(); Rs();
-					}
-				}
-				
-				else if( ( g[6]=='R' && o[6]=='B' )  || ( g[6]=='B' && o[6]=='R' ) )		//OG
-				{
-					if( (  g[9]=='W' && o[9]=='R' && y[3]=='B'	) || (  g[9]=='B' && o[9]=='W' && y[3]=='R' ) || (  g[9]=='R' && o[9]=='B' && y[3]=='W'	)  )
-					{
-						D(); Bs(); Ds();
-					}
-					else
-					{
-						D(); B(); Ds();
-					}
-				}
-				
-				else if( (b[6]=='R' && o[4]=='B')  || (b[6]=='B' && o[4]=='R')  ) 	//OB
-				{
-					if( ( o[7]=='W' && b[9]=='R' && y[1]=='B' ) || ( o[7]=='B' && b[9]=='W' && y[1]=='R' ) || ( o[7]=='R' && b[9]=='B' && y[1]=='W' ) )
-					{
-						L(); Bs(); Ls();
-					}
-					else
-					{
-						L(); B(); Ls();
-					}
-				}
-		
-				//////////////////////  PAIR UP COMPLETE
-				
-				
-				if( r[7]=='W' && b[7]=='B' && b[8]=='B' && y[4]=='R' && y[7]=='R')
-				{
-					Bs(); Ls(); B(); L(); break p1;
-				}
-				
-				else if( r[8]=='B' && r[9]=='B' && y[8]=='R' && y[9]=='R' && g[7]=='W' )
-				{
-					Ls(); B(); L(); break p1;
-				}
-				
-				else if( o[9]=='W' && g[8]=='B' && g[9]=='B' && y[3]=='R' && y[6]=='R' )
-				{
-					B(); Ls(); B(); L(); break p1;
-				}
-				
-				else if( o[7]=='B' && o[8]=='B' && y[1]=='R' && y[2]=='R' && b[9]=='W' )
-				{
-					B(); B(); Ls(); B(); L(); break p1;
-				}
-				
-				//////////////////// BREAKING UP BAD PAIRS
-				
-				// BO
-				
-				if( ( (o[7]=='B' && b[9]=='W' && y[1]=='R')  || (o[7]=='R' && b[9]=='B' && y[1]=='W')  || (o[7]=='W' && b[9]=='R' && y[1]=='B')   )  &&  (  ( o[8]=='R' && y[2]=='B'  ) || ( o[8]=='B' && y[2]=='R'  )  )  )
-				{
-					Ls(); B(); L();
-				}
-				
-				// RB
-				
-				else if( ( (r[7]=='W' && b[7]=='B' && y[7]=='R')  || (r[7]=='R' && b[7]=='W' && y[7]=='B')  || (r[7]=='B' && b[7]=='R' && y[7]=='W') ) &&  ( (b[8]=='R' && y[4]=='B')  || (b[8]=='B' && y[4]=='R') )  )
-				{
-					B(); Ls(); B(); L();
-				}
-				
-				else if( ( (r[9]=='B' && g[7]=='W' && y[9]=='R') ||  (r[9]=='R' && g[7]=='B' && y[9]=='W')   || (r[9]=='W' && g[7]=='R' && y[9]=='B') ) && ( (r[8]=='R' && y[8]=='B') || (r[8]=='B' && y[8]=='R') ) )
-				{
-					B(); B(); Ls(); B(); L();
-				}
-				
-				else if( ( (o[9]=='W' && g[9]=='B' && y[3]=='R')  || (o[9]=='R' && g[9]=='W' && y[3]=='B')  || (o[9]=='B' && g[9]=='R' && y[3]=='W') ) && ( (g[8]=='R' && y[6]=='B') || (g[8]=='B' && y[6]=='R') ) )
-				{
-					Bs(); Ls(); B(); L();
-				}
-				
-				//////////////  FUCKED UP BAD PAIRS
-				
-				if( ( (o[7]=='B' && b[9]=='W' && y[1]=='R')  || (o[7]=='R' && b[9]=='B' && y[1]=='W')  || (o[7]=='W' && b[9]=='R' && y[1]=='B')   ) &&  ( (b[8]=='R' && y[4]=='B')  || (b[8]=='B' && y[4]=='R') ) )
-				{
-					B(); B(); U(); Bs(); Us();
-				}
-				
-				else if( ( (r[7]=='W' && b[7]=='B' && y[7]=='R')  || (r[7]=='R' && b[7]=='W' && y[7]=='B')  || (r[7]=='B' && b[7]=='R' && y[7]=='W') ) &&  ( (r[8]=='R' && y[8]=='B') || (r[8]=='B' && y[8]=='R') ) )
-				{
-					Bs(); U(); Bs(); Us();
-				}
-				
-				else if(  ( (r[9]=='B' && g[7]=='W' && y[9]=='R') ||  (r[9]=='R' && g[7]=='B' && y[9]=='W')   || (r[9]=='W' && g[7]=='R' && y[9]=='B') ) &&  ( (g[8]=='R' && y[6]=='B') || (g[8]=='B' && y[6]=='R') ) )
-				{
-					U(); Bs(); Us();
-				}
-				
-				else if(  ( (o[9]=='W' && g[9]=='B' && y[3]=='R')  || (o[9]=='R' && g[9]=='W' && y[3]=='B')  || (o[9]=='B' && g[9]=='R' && y[3]=='W') ) &&   (  ( o[8]=='R' && y[2]=='B'  ) || ( o[8]=='B' && y[2]=='R'  )  )    )
-				{
-					B(); U(); Bs(); Us();
-				}
-				
-				///////////////////////// WHITE ON TOP
-				
-				/////////////////////  RED TOP
-				
-				if(g[9]=='R' && o[9]=='B' && y[3]=='W' && b[8]=='B' && y[4]=='R')
-				{
-					Ls(); Bs(); L(); Bs(); Ls(); B(); L(); break p1;	
-				}
-				
-				else if(b[9]=='B' && o[7]=='R' && y[1]=='W' && r[8]=='B' && y[8]=='R')
-				{
-					B(); Ls(); Bs(); L(); Bs(); Ls(); B(); L(); break p1;
-				}
-				
-				else if(r[7]=='B' && b[7]=='R' && y[7]=='W' && y[6]=='R' && g[8]=='B')
-				{
-					B(); B(); Ls(); Bs(); L(); Bs(); Ls(); B(); L(); break p1;
-				}
-				
-				else if(r[9]=='R' && g[7]=='B' && y[9]=='W' && y[2]=='R' && o[8]=='B')
-				{
-					Bs(); Ls(); Bs(); L(); Bs(); Ls(); B(); L(); break p1;
-				}
-				
-				else if(r[9]=='R' && g[7]=='B' && y[9]=='W' && y[4]=='R' && b[8]=='B')
-				{
-					Ls(); B(); B(); L(); Bs(); Ls(); B(); L(); break p1;
-				}
-				
-				else if(g[9]=='R' && o[9]=='B' && y[3]=='W' && r[8]=='B' && y[8]=='R')
-				{
-					B(); Ls(); B(); B(); L(); Bs(); Ls(); B(); L(); break p1;
-				}
-				
-				else if(b[9]=='B' && o[7]=='R' && y[1]=='W' && g[8]=='B' && y[6]=='R')
-				{
-					B(); B(); Ls(); B(); B(); L(); Bs(); Ls(); B(); L(); break p1;
-				}
-				
-				else if(r[7]=='B' && b[7]=='R' && y[7]=='W' && y[2]=='R' && o[8]=='B')
-				{
-					Bs(); Ls(); B(); B(); L(); Bs(); Ls(); B(); L(); break p1;
-				}
-				
-				////////////////////  BLUE TOP
-				
-				else if(g[9]=='R' && o[9]=='B' && y[3]=='W' && r[8]=='R' && y[8]=='B')
-				{
-					U(); B(); Us(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				else if(b[9]=='B' && o[7]=='R' && y[1]=='W' && g[8]=='R' && y[6]=='B')
-				{
-					B(); U(); B(); Us(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				else if(r[7]=='B' && b[7]=='R' && y[7]=='W' && y[2]=='B' && o[8]=='R')
-				{
-					B(); B(); U(); B(); Us(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				else if(r[9]=='R' && g[7]=='B' && y[9]=='W' && y[4]=='B' && b[8]=='R')
-				{
-					Bs(); U(); B(); Us(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				else if(b[9]=='B' && o[7]=='R' && y[1]=='W' && r[8]=='R' && y[8]=='B')
-				{
-					U(); B(); B(); Us(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				else if(r[7]=='B' && b[7]=='R' && y[7]=='W' && y[6]=='B' && g[8]=='R')
-				{
-					B(); U(); B(); B(); Us(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				else if(r[9]=='R' && g[7]=='B' && y[9]=='W' && y[2]=='B' && o[8]=='R')
-				{
-					B(); B(); U(); B(); B(); Us(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				else if(g[9]=='R' && o[9]=='B' && y[3]=='W' && b[8]=='R' && y[4]=='B')
-				{
-					Bs(); U(); B(); B(); Us(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				////////////////////////// BOTH BLUE TOP 
-				
-				else if(r[9]=='W' && g[7]=='R' && y[9]=='B' && y[2]=='B' && o[8]=='R')
-				{
-					U(); B(); Us(); B(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				else if(g[9]=='W' && o[9]=='R' && y[3]=='B' && b[8]=='R' && y[4]=='B')
-				{
-					B(); U(); B(); Us(); B(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				else if(o[7]=='W' && y[1]=='B' && b[9]=='R' && y[8]=='B' && r[8]=='R')
-				{
-					B(); B(); U(); B(); Us(); B(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				else if(b[7]=='W' && r[7]=='R' && y[7]=='B' && y[6]=='B' && g[8]=='R')
-				{
-					Bs(); U(); B(); Us(); B(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				else if(r[9]=='W' && g[7]=='R' && y[9]=='B' && y[4]=='B' && b[8]=='R')
-				{
-					U(); B(); B(); Us(); B(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				else if(g[9]=='W' && o[9]=='R' && y[3]=='B' && y[8]=='B' && r[8]=='R')
-				{
-					B(); U(); B(); B(); Us(); B(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				else if(o[7]=='W' && y[1]=='B' && b[9]=='R' && y[6]=='B' && g[8]=='R')
-				{
-					B(); B(); U(); B(); B(); Us(); B(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				else if(b[7]=='W' && r[7]=='R' && y[7]=='B' && y[2]=='B' && o[8]=='R')
-				{
-					Bs(); U(); B(); B(); Us(); B(); B(); U(); Bs(); Us(); break p1;
-				}
-				
-				////////////////////////// BOTH RED TOP
-				
-				else if(b[9]=='W' && o[7]=='B' && y[1]=='R' && y[6]=='R' && g[8]=='B')
-				{
-					Ls(); Bs(); L(); B(); B(); Ls(); B(); L(); break p1;
-				}
-				
-				else if(r[7]=='W' && b[7]=='B' && y[7]=='R' && y[2]=='R' && o[8]=='B')
-				{
-					B(); Ls(); Bs(); L(); B(); B(); Ls(); B(); L(); break p1;
-				}
-				
-				else if(g[7]=='W' && r[9]=='B' && y[9]=='R' && y[4]=='R' && b[8]=='B')
-				{
-					B(); B(); Ls(); Bs(); L(); B(); B(); Ls(); B(); L(); break p1;
-				}
-				
-				else if(o[9]=='W' && g[9]=='B' && y[3]=='R' && y[8]=='R' && r[8]=='B')
-				{
-					Bs(); Ls(); Bs(); L(); B(); B(); Ls(); B(); L(); break p1;
-				}
-				
-				else if(b[9]=='W' && o[7]=='B' && y[1]=='R' && y[8]=='R' && r[8]=='B')
-				{
-					Ls(); B(); B(); L(); B(); B(); Ls(); B(); L(); break p1;
-				}
-				
-				else if(r[7]=='W' && b[7]=='B' && y[7]=='R' && y[6]=='R' && g[8]=='B')
-				{
-					B(); Ls(); B(); B(); L(); B(); B(); Ls(); B(); L(); break p1;
-				}
-				
-				else if(g[7]=='W' && r[9]=='B' && y[9]=='R' && y[2]=='R' && o[8]=='B')
-				{
-					B(); B(); Ls(); B(); B(); L(); B(); B(); Ls(); B(); L(); break p1;
-				}
-				
-				else if(o[9]=='W' && g[9]=='B' && y[3]=='R' && y[4]=='R' && b[8]=='B')
-				{
-					Bs(); Ls(); B(); B(); L(); B(); B(); Ls(); B(); L(); break p1;
-				}
-				
-				////////////////////////// CORNER RED - EDGE BLUE
-				
-				else if(r[7]=='W' && b[7]=='B' && y[7]=='R' && y[6]=='B' && g[8]=='R')
-				{
-					U(); B(); Us();
-				}
-				
-				else if(g[7]=='W' && r[9]=='B' && y[9]=='R' && y[2]=='B' && o[8]=='R')
-				{
-					B(); U(); B(); Us();
-				}
-				
-				else if(o[9]=='W' && g[9]=='B' && y[3]=='R' && y[4]=='B' && b[8]=='R')
-				{
-					B(); B(); U(); B(); Us();
-				}
-				
-				else if(b[9]=='W' && o[7]=='B' && y[1]=='R' && y[8]=='B' && r[8]=='R')
-				{
-					Bs(); U(); B(); Us();
-				}
-				
-				else if(b[9]=='W' && o[7]=='B' && y[1]=='R' && y[6]=='B' && g[8]=='R')
-				{
-					Ls(); B(); L(); Bs(); U(); B(); Us();
-				}
-				
-				else if(r[7]=='W' && b[7]=='B' && y[7]=='R' && y[2]=='B' && o[8]=='R')
-				{
-					B(); Ls(); B(); L(); Bs(); U(); B(); Us();
-				}
-				
-				else if(g[7]=='W' && r[9]=='B' && y[9]=='R' && y[4]=='B' && b[8]=='R')
-				{
-					B(); B(); Ls(); B(); L(); Bs(); U(); B(); Us();
-				}
-				
-				else if(o[9]=='W' && g[9]=='B' && y[3]=='R' && y[8]=='B' && r[8]=='R')
-				{
-					Bs(); Ls(); B(); L(); Bs(); U(); B(); Us();
-				}
-				
-				////////////////////////// CORNER BLUE - EDGE RED
-				
-				else if(b[7]=='W' && r[7]=='R' && y[7]=='B' && y[2]=='R' && o[8]=='B')
-				{
-					Ls(); Bs(); L();
-				}
-				
-				else if(r[9]=='W' && g[7]=='R' && y[9]=='B' && y[4]=='R' && b[8]=='B')
-				{
-					B(); Ls(); Bs(); L();
-				}
-				
-				else if(g[9]=='W' && o[9]=='R' && y[3]=='B' && y[8]=='R' && r[8]=='B')
-				{
-					B(); B(); Ls(); Bs(); L();
-				}
-				
-				else if(o[7]=='W' && y[1]=='B' && b[9]=='R' && y[6]=='R' && g[8]=='B')
-				{
-					Bs(); Ls(); Bs(); L();
-				}
-				
-				else if(o[7]=='W' && y[1]=='B' && b[9]=='R' &&  y[8]=='R' && r[8]=='B')
-				{
-					Ls(); Bs(); L(); Bs(); Ls(); Bs(); L();
-				}
-				
-				else if(b[7]=='W' && r[7]=='R' && y[7]=='B' && y[6]=='R' && g[8]=='B')
-				{
-					B(); Ls(); Bs(); L(); Bs(); Ls(); Bs(); L();
-				}
-				
-				else if(r[9]=='W' && g[7]=='R' && y[9]=='B' && y[2]=='R' && o[8]=='B')
-				{
-					B(); B(); Ls(); Bs(); L(); Bs(); Ls(); Bs(); L();
-				}
-				
-				else if(g[9]=='W' && o[9]=='R' && y[3]=='B' && y[4]=='R' && b[8]=='B')
-				{
-					Bs(); Ls(); Bs(); L(); Bs(); Ls(); Bs(); L();
-				}
-				
-			}
-			
-		}
-	}
-	
-	else if(n==1)
-	{	//RG
-		p2:
-		{
-			if(f2l_rg()==0) // RG F2L
-			{
-				
-				//////////////////  FIRST TO THIRD
-				
-				if(	 (w[1]=='R' && r[1]=='W' && b[1]=='G') ||	(w[1]=='G' && r[1]=='R' && b[1]=='W') || (w[1]=='W' && r[1]=='G' && b[1]=='R')	)
-				{
-					Ls(); Bs(); L();
-				}
-				
-				else if(  (w[3]=='G' && r[3]=='W' && g[1]=='R') || (w[3]=='R' && r[3]=='G' && g[1]=='W') || (w[3]=='W' && r[3]=='R' && g[1]=='G')  )
-				{
-					R(); Bs(); Rs();
-				}
-				
-				else if(  (w[9]=='W' && g[3]=='R' && o[3]=='G') || (w[9]=='G' && g[3]=='W' && o[3]=='R') || (w[9]=='R' && g[3]=='G' && o[3]=='W')   )
-				{
-					Rs(); Bs(); R();
-				}
-				
-				else if(  (w[7]=='W' && b[3]=='G' && o[1]=='R') || (w[7]=='R' && b[3]=='W' && o[1]=='G') || (w[7]=='G' && b[3]=='R' && o[1]=='W')   )
-				{
-					L(); Bs(); Ls();
-				}
-				
-				//////////////////  SECOND TO THIRD
-				
-				if( (r[4]=='R' && b[4]=='G') || (r[4]=='G' && b[4]=='R') )		//BR
-				{
-					if(	(r[7]=='G' && b[7]=='W' && y[7]=='R')  || (r[7]=='R' && b[7]=='G' && y[7]=='W')  || (r[7]=='W' && b[7]=='R' && y[7]=='G') )
-					{
-						U(); Bs(); Us();
-					}
-					else
-					{
-						U(); B(); Us();
-					}
-				}
-				
-				else if( ( r[6]=='R' && g[4]=='G' )  || ( r[6]=='G' && g[4]=='R' )  )		//RG
-				{
-					if( ( r[9]=='G' && g[7]=='R' && y[9]=='W' ) || ( r[9]=='W' && g[7]=='G' && y[9]=='R' ) || ( r[9]=='R' && g[7]=='W' && y[9]=='G' )  )
-					{
-						R(); Bs(); Rs();
-					}
-					else
-					{
-						R(); B(); Rs();
-					}
-				}
-				
-				else if( ( g[6]=='R' && o[6]=='G' )  || ( g[6]=='G' && o[6]=='R' ) )		//OG
-				{
-					if( (  g[9]=='W' && o[9]=='G' && y[3]=='R'	) || (  g[9]=='R' && o[9]=='W' && y[3]=='G' ) || (  g[9]=='G' && o[9]=='R' && y[3]=='W'	)  )
-					{
-						D(); Bs(); Ds();
-					}
-					else
-					{
-						D(); B(); Ds();
-					}
-				}
-				
-				else if( (b[6]=='R' && o[4]=='G')  || (b[6]=='G' && o[4]=='R')  ) 	//OB
-				{
-					if( ( o[7]=='W' && b[9]=='G' && y[1]=='R' ) || ( o[7]=='R' && b[9]=='W' && y[1]=='G' ) || ( o[7]=='G' && b[9]=='R' && y[1]=='W' ) )
-					{
-						L(); Bs(); Ls();
-					}
-					else
-					{
-						L(); B(); Ls();
-					}
-				}
-		
-				//////////////////////  PAIR UP COMPLETE
-				
-				if( r[7]=='W' && b[7]=='R' && b[8]=='R' && y[4]=='G' && y[7]=='G')
-				{
-					B(); B(); Us(); B(); U(); break p2;
-				}
-				
-				else if( r[8]=='R' && r[9]=='R' && y[8]=='G' && y[9]=='G' && g[7]=='W' )
-				{
-					Bs(); Us(); B(); U(); break p2;
-				}
-				
-				else if( o[9]=='W' && g[8]=='R' && g[9]=='R' && y[3]=='G' && y[6]=='G' )
-				{
-					Us(); B(); U(); break p2;
-				}
-				
-				else if( o[7]=='R' && o[8]=='R' && y[1]=='G' && y[2]=='G' && b[9]=='W' )
-				{
-					B(); Us(); B(); U(); break p2;
-				}
-				
-				//////////////////// BREAKING UP BAD PAIRS
-				
-				// BO
-				
-				if( ( (o[7]=='R' && b[9]=='W' && y[1]=='G')  || (o[7]=='G' && b[9]=='R' && y[1]=='W')  || (o[7]=='W' && b[9]=='G' && y[1]=='R')   )  &&  ( (b[8]=='R' && y[4]=='G')  || (b[8]=='G' && y[4]=='R') )  )
-				{
-					B(); R(); Bs(); Rs();
-				}
-				
-				// RB
-				
-				else if( ( (r[7]=='W' && b[7]=='R' && y[7]=='G')  || (r[7]=='G' && b[7]=='W' && y[7]=='R')  || (r[7]=='R' && b[7]=='G' && y[7]=='W') ) &&  ( (r[8]=='R' && y[8]=='G') || (r[8]=='G' && y[8]=='R') )   )
-				{
-					B(); B(); R(); Bs(); Rs();
-				}
-				
-				else if( ( (r[9]=='R' && g[7]=='W' && y[9]=='G') ||  (r[9]=='G' && g[7]=='R' && y[9]=='W')   || (r[9]=='W' && g[7]=='G' && y[9]=='R') ) && ( (g[8]=='R' && y[6]=='G') || (g[8]=='G' && y[6]=='R') ) )
-				{
-					Bs(); R(); Bs(); Rs();
-				}
-				
-				else if( ( (o[9]=='W' && g[9]=='R' && y[3]=='G')  || (o[9]=='G' && g[9]=='W' && y[3]=='R')  || (o[9]=='R' && g[9]=='G' && y[3]=='W') ) && (  ( o[8]=='R' && y[2]=='G'  ) || ( o[8]=='G' && y[2]=='R'  )  ) )
-				{
-					R(); Bs(); Rs();
-				}
-				
-				//////////////  FUCKED UP BAD PAIRS
-				
-				if( ( (o[7]=='R' && b[9]=='W' && y[1]=='G')  || (o[7]=='G' && b[9]=='R' && y[1]=='W')  || (o[7]=='W' && b[9]=='G' && y[1]=='R')   ) && (  ( o[8]=='R' && y[2]=='G'  ) || ( o[8]=='G' && y[2]=='R') )  )
-				{
-					Bs(); Us(); B(); U();
-				}
-				
-				else if( ( (r[7]=='W' && b[7]=='R' && y[7]=='G')  || (r[7]=='G' && b[7]=='W' && y[7]=='R')  || (r[7]=='R' && b[7]=='G' && y[7]=='W') ) &&  ( (b[8]=='R' && y[4]=='G')  || (b[8]=='G' && y[4]=='R') ) )
-				{
-					Us(); B(); U();
-				}
-				
-				else if(  ( (r[9]=='R' && g[7]=='W' && y[9]=='G') ||  (r[9]=='G' && g[7]=='R' && y[9]=='W')   || (r[9]=='W' && g[7]=='G' && y[9]=='R') ) &&  ( (r[8]=='R' && y[8]=='G') || (r[8]=='G' && y[8]=='R') ) )
-				{
-					B(); Us(); B(); U();
-				}
-				
-				else if(  ( (o[9]=='W' && g[9]=='R' && y[3]=='G')  || (o[9]=='G' && g[9]=='W' && y[3]=='R')  || (o[9]=='R' && g[9]=='G' && y[3]=='W') ) &&   ( (g[8]=='R' && y[6]=='G') || (g[8]=='G' && y[6]=='R') ) )
-				{
-					B(); B(); Us(); B(); U();
-				}
-				
-				///////////////////////// WHITE ON TOP
-				
-				/////////////////////  RED TOP
-				
-				if(g[9]=='G' && o[9]=='R' && y[3]=='W' && b[8]=='G' && y[4]=='R')
-				{
-					B(); B(); R(); B(); B(); Rs(); B(); R(); Bs(); Rs(); break p2;
-				}
-				
-				else if(b[9]=='R' && o[7]=='G' && y[1]=='W' && r[8]=='G' && y[8]=='R')
-				{
-					Bs(); R(); B(); B(); Rs(); B(); R(); Bs(); Rs(); break p2;
-				}
-				
-				else if(r[7]=='R' && b[7]=='G' && y[7]=='W' && y[6]=='R' && g[8]=='G')
-				{
-					R(); B(); B(); Rs(); B(); R(); Bs(); Rs(); break p2;
-				}
-				
-				else if(r[9]=='G' && g[7]=='R' && y[9]=='W' && y[2]=='R' && o[8]=='G')
-				{
-					B(); R(); B(); B(); Rs(); B(); R(); Bs(); Rs(); break p2;
-				}
-			/////////////////////////////////////////////////////////////////////////////////////////
-				
-				else if(r[9]=='G' && g[7]=='R' && y[9]=='W' && y[4]=='R' && b[8]=='G')
-				{
-					B(); B(); R(); B(); Rs(); B(); R(); Bs(); Rs(); break p2;
-				}
-				
-				else if(g[9]=='G' && o[9]=='R' && y[3]=='W' && r[8]=='G' && y[8]=='R')
-				{
-					Bs(); R(); B(); Rs(); B(); R(); Bs(); Rs(); break p2;
-				}
-				
-				else if(b[9]=='R' && o[7]=='G' && y[1]=='W' && g[8]=='G' && y[6]=='R')
-				{
-					R(); B(); Rs(); B(); R(); Bs(); Rs(); break p2;
-				}
-				
-				else if(r[7]=='R' && b[7]=='G' && y[7]=='W' && y[2]=='R' && o[8]=='G')
-				{
-					B(); R(); B(); Rs(); B(); R(); Bs(); Rs(); break p2;
-				}
-				
-				////////////////////  GREEN TOP
-				
-				else if(g[9]=='G' && o[9]=='R' && y[3]=='W' && r[8]=='R' && y[8]=='G')
-				{
-					Us(); B(); B(); U(); Bs(); Us(); B(); U(); break p2;
-				}
-				
-				else if(b[9]=='R' && o[7]=='G' && y[1]=='W' && g[8]=='R' && y[6]=='G')
-				{
-					B(); Us(); B(); B(); U(); Bs(); Us(); B(); U(); break p2;
-				}
-				
-				else if(r[7]=='R' && b[7]=='G' && y[7]=='W' && y[2]=='G' && o[8]=='R')
-				{
-					B(); B(); Us(); B(); B(); U(); Bs(); Us(); B(); U(); break p2;
-				}
-				
-				else if(r[9]=='G' && g[7]=='R' && y[9]=='W' && y[4]=='G' && b[8]=='R')
-				{
-					Bs(); Us(); B(); B(); U(); Bs(); Us(); B(); U(); break p2;
-				}
-			//////////////////////////////////////////////////////////////////////////////////////////////////
-				
-				else if(b[9]=='R' && o[7]=='G' && y[1]=='W' && r[8]=='R' && y[8]=='G')
-				{
-					Us(); Bs(); U(); Bs(); Us(); B(); U(); break p2;
-				}
-				
-				else if(r[7]=='R' && b[7]=='G' && y[7]=='W' && y[6]=='G' && g[8]=='R')
-				{
-					B(); Us(); Bs(); U(); Bs(); Us(); B(); U(); break p2;
-				}
-				
-				else if(r[9]=='G' && g[7]=='R' && y[9]=='W' && y[2]=='G' && o[8]=='R')
-				{
-					B(); B(); Us(); Bs(); U(); Bs(); Us(); B(); U(); break p2;
-				}
-				
-				else if(g[9]=='G' && o[9]=='R' && y[3]=='W' && b[8]=='R' && y[4]=='G')
-				{
-					Bs(); Us(); Bs(); U(); Bs(); Us(); B(); U(); break p2;
-				}
-				
-				////////////////////////// BOTH GREEN TOP 
-				
-				else if(r[9]=='R' && g[7]=='W' && y[9]=='G' && y[2]=='G' && o[8]=='R')
-				{
-					B(); Us(); B(); B(); U(); B(); B(); Us(); B(); U(); break p2;
-				}
-				
-				else if(g[9]=='R' && o[9]=='W' && y[3]=='G' && b[8]=='R' && y[4]=='G')
-				{
-					B(); B(); Us(); B(); B(); U(); B(); B(); Us(); B(); U(); break p2;
-				}
-				
-				else if(o[7]=='R' && y[1]=='G' && b[9]=='W' && y[8]=='G' && r[8]=='R')
-				{
-					Bs(); Us(); B(); B(); U(); B(); B(); Us(); B(); U(); break p2;
-				}
-				
-				else if(b[7]=='R' && r[7]=='W' && y[7]=='G' && y[6]=='G' && g[8]=='R')
-				{
-					Us(); B(); B(); U(); B(); B(); Us(); B(); U(); break p2;
-				}
-			///////////////////////////////////////////////////////////////////////////////////////	
-			
-				else if(r[9]=='R' && g[7]=='W' && y[9]=='G' && y[4]=='G' && b[8]=='R')
-				{
-					B(); Us(); Bs(); U(); B(); B(); Us(); B(); U(); break p2;
-				}
-				
-				else if(g[9]=='R' && o[9]=='W' && y[3]=='G' && y[8]=='G' && r[8]=='R')
-				{
-					B(); B(); Us(); Bs(); U(); B(); B(); Us(); B(); U(); break p2;
-				}
-				
-				else if(o[7]=='R' && y[1]=='G' && b[9]=='W' && y[6]=='G' && g[8]=='R')
-				{
-					Bs(); Us(); Bs(); U(); B(); B(); Us(); B(); U(); break p2;
-				}
-				
-				else if(b[7]=='R' && r[7]=='W' && y[7]=='G' && y[2]=='G' && o[8]=='R')
-				{
-					Us(); Bs(); U(); B(); B(); Us(); B(); U(); break p2;
-				}
-				
-				////////////////////////// BOTH RED TOP
-				
-				else if(b[9]=='G' && o[7]=='W' && y[1]=='R' && y[6]=='R' && g[8]=='G')
-				{
-					B(); R(); B(); B(); Rs(); B(); B(); R(); Bs(); Rs(); break p2;
-				}
-				
-				else if(r[7]=='G' && b[7]=='W' && y[7]=='R' && y[2]=='R' && o[8]=='G')
-				{
-					B(); B(); R(); B(); B(); Rs(); B(); B(); R(); Bs(); Rs(); break p2;
-				}
-				
-				else if(g[7]=='G' && r[9]=='W' && y[9]=='R' && y[4]=='R' && b[8]=='G')
-				{
-					Bs(); R(); B(); B(); Rs(); B(); B(); R(); Bs(); Rs(); break p2;
-				}
-				
-				else if(o[9]=='G' && g[9]=='W' && y[3]=='R' && y[8]=='R' && r[8]=='G')
-				{
-					R(); B(); B(); Rs(); B(); B(); R(); Bs(); Rs(); break p2;
-				}
-			/////////////////////////////////////////////////////////////////////////////////////
-				
-				else if(b[9]=='G' && o[7]=='W' && y[1]=='R' && y[8]=='R' && r[8]=='G')
-				{
-					B(); R(); B(); Rs(); B(); B(); R(); Bs(); Rs(); break p2;
-				}
-				
-				else if(r[7]=='G' && b[7]=='W' && y[7]=='R' && y[6]=='R' && g[8]=='G')
-				{
-					B(); B(); R(); B(); Rs(); B(); B(); R(); Bs(); Rs(); break p2;
-				}
-				
-				else if(g[7]=='G' && r[9]=='W' && y[9]=='R' && y[2]=='R' && o[8]=='G')
-				{
-					Bs(); R(); B(); Rs(); B(); B(); R(); Bs(); Rs(); break p2;
-				}
-				
-				else if(o[9]=='G' && g[9]=='W' && y[3]=='R' && y[4]=='R' && b[8]=='G')
-				{
-					R(); B(); Rs(); B(); B(); R(); Bs(); Rs(); break p2;
-				}
-				
-				////////////////////////// CORNER RED - EDGE GREEN
-				
-				else if(r[7]=='G' && b[7]=='W' && y[7]=='R' && y[6]=='G' && g[8]=='R')
-				{
-					Us(); Bs(); U(); Bs(); Us(); Bs(); U(); break p2;
-				}
-				
-				else if(g[7]=='G' && r[9]=='W' && y[9]=='R' && y[2]=='G' && o[8]=='R')
-				{
-					B(); Us(); Bs(); U(); Bs(); Us(); Bs(); U(); break p2;
-				}
-				
-				else if(o[9]=='G' && g[9]=='W' && y[3]=='R' && y[4]=='G' && b[8]=='R')
-				{
-					B(); B(); Us(); Bs(); U(); Bs(); Us(); Bs(); U(); break p2;
-				}
-				
-				else if(b[9]=='G' && o[7]=='W' && y[1]=='R' && y[8]=='G' && r[8]=='R')
-				{
-					Bs(); Us(); Bs(); U(); Bs(); Us(); Bs(); U(); break p2;
-				}
-			/////////////////////////////////////////////////////////////////////////////////////
-				
-				else if(b[9]=='G' && o[7]=='W' && y[1]=='R' && y[6]=='G' && g[8]=='R')
-				{
-					B(); B(); Us(); Bs(); U(); break p2;
-				}
-				
-				else if(r[7]=='G' && b[7]=='W' && y[7]=='R' && y[2]=='G' && o[8]=='R')
-				{
-					Bs(); Us(); Bs(); U(); break p2;
-				}
-				
-				else if(g[7]=='G' && r[9]=='W' && y[9]=='R' && y[4]=='G' && b[8]=='R')
-				{
-					Us(); Bs(); U(); break p2;
-				}
-				
-				else if(o[9]=='G' && g[9]=='W' && y[3]=='R' && y[8]=='G' && r[8]=='R')
-				{
-					B(); Us(); Bs(); U(); break p2;
-				}
-				
-				////////////////////////// CORNER GREEN - EDGE RED
-				
-				else if(b[7]=='R' && r[7]=='W' && y[7]=='G' && y[2]=='R' && o[8]=='G')
-				{
-					Us(); B(); U(); Bs(); R(); B(); Rs(); break p2;
-				}
-				
-				else if(r[9]=='R' && g[7]=='W' && y[9]=='G' && y[4]=='R' && b[8]=='G')
-				{
-					B(); Us(); B(); U(); Bs(); R(); B(); Rs(); break p2;
-				}
-				
-				else if(g[9]=='R' && o[9]=='W' && y[3]=='G' && y[8]=='R' && r[8]=='G')
-				{
-					B(); B(); Us(); B(); U(); Bs(); R(); B(); Rs(); break p2;
-				}
-				
-				else if(o[7]=='R' && b[9]=='W' && y[1]=='G' && y[6]=='R' && g[8]=='G')
-				{
-					Bs(); Us(); B(); U(); Bs(); R(); B(); Rs(); break p2;
-				}
-				
-			/////////////////////////////////////////////////////////////////////////////////
-				
-				else if(o[7]=='R' && b[9]=='W' && y[1]=='G' &&  y[8]=='R' && r[8]=='G')
-				{
-					B(); B(); R(); B(); Rs(); break p2; 
-				}
-				
-				else if(b[7]=='R' && r[7]=='W' && y[7]=='G' && y[6]=='R' && g[8]=='G')
-				{
-					Bs(); R(); B(); Rs(); break p2;
-				}
-				
-				else if(r[9]=='R' && g[7]=='W' && y[9]=='G' && y[2]=='R' && o[8]=='G')
-				{
-					R(); B(); Rs(); break p2;
-				}
-				
-				else if(g[9]=='R' && o[9]=='W' && y[3]=='G' && y[4]=='R' && b[8]=='G')
-				{
-					B(); R(); B(); Rs(); break p2;
-				}
-			}
-					
-		}
-	}
-	
-	else if(n==2)
-	{	// GO
-		p3:
-		{					
-			if(f2l_go()==0)	// OG F2L
-			{
-				
-				//////////////////  FIRST TO THIRD
-				
-				if(	 (w[1]=='O' && r[1]=='G' && b[1]=='W') ||	(w[1]=='W' && r[1]=='O' && b[1]=='G') || (w[1]=='G' && r[1]=='W' && b[1]=='O')	)
-				{
-					Ls(); Bs(); L();
-				}
-				
-				else if(  (w[3]=='W' && r[3]=='G' && g[1]=='O') || (w[3]=='O' && r[3]=='W' && g[1]=='G') || (w[3]=='G' && r[3]=='O' && g[1]=='W')  )
-				{
-					R(); Bs(); Rs(); 
-				}
-				
-				else if(  (w[9]=='W' && g[3]=='G' && o[3]=='O') || (w[9]=='O' && g[3]=='W' && o[3]=='G') || (w[9]=='G' && g[3]=='O' && o[3]=='W')   )
-				{
-					Rs(); Bs(); R();
-				}
-				
-				else if(  (w[7]=='W' && b[3]=='O' && o[1]=='G') || (w[7]=='G' && b[3]=='W' && o[1]=='O') || (w[7]=='O' && b[3]=='G' && o[1]=='W')   )
-				{
-					L(); Bs(); Ls();
-				}
-				
-				//////////////////  SECOND TO THIRD
-				
-				if( (r[4]=='O' && b[4]=='G') || (r[4]=='G' && b[4]=='O') )		//BR
-				{
-					if(	(r[7]=='W' && b[7]=='G' && y[7]=='O')  || (r[7]=='O' && b[7]=='W' && y[7]=='G')  || (r[7]=='G' && b[7]=='O' && y[7]=='W') )
-					{
-						U(); Bs(); Us();
-					}
-					else
-					{
-						U(); B(); Us();
-					}
-				}
-				
-				else if( ( r[6]=='O' && g[4]=='G' )  || ( r[6]=='G' && g[4]=='O' )  )		//RG
-				{
-					if( ( r[9]=='G' && g[7]=='W' && y[9]=='O' ) || ( r[9]=='O' && g[7]=='G' && y[9]=='W' ) || ( r[9]=='W' && g[7]=='O' && y[9]=='G' )  )
-					{
-						R(); Bs(); Rs();
-					}
-					else
-					{
-						R(); B(); Rs();
-					}
-				}
-				
-				else if( ( g[6]=='O' && o[6]=='G' )  || ( g[6]=='G' && o[6]=='O' ) )		//OG
-				{
-					if( (  g[9]=='G' && o[9]=='W' && y[3]=='O'	) || (  g[9]=='O' && o[9]=='G' && y[3]=='W' ) || (  g[9]=='W' && o[9]=='O' && y[3]=='G'	)  )
-					{
-						D(); Bs(); Ds();
-					}
-					else
-					{
-						D(); B(); Ds();
-					}
-				}
-				
-				else if( (b[6]=='O' && o[4]=='G')  || (b[6]=='G' && o[4]=='O')  ) 	//OB
-				{
-					if( ( o[7]=='O' && b[9]=='G' && y[1]=='W' ) || ( o[7]=='W' && b[9]=='O' && y[1]=='G' ) || ( o[7]=='G' && b[9]=='W' && y[1]=='O' ) )
-					{
-						L(); Bs(); Ls();
-					}
-					else
-					{
-						L(); B(); Ls();
-					}
-				}
-		
-				//////////////////////  PAIR UP COMPLETE
-				
-				if( r[9]=='W' && g[7]=='O' && g[8]=='O' && y[6]=='G' && y[9]=='G')
-				{
-					D(); Bs(); Ds(); break p3;
-				}
-				
-				else if( g[9]=='W' && o[8]=='O' && o[9]=='O' && y[2]=='G' && y[3]=='G' )
-				{
-					B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				else if( o[7]=='W' && b[8]=='O' && b[9]=='O' && y[1]=='G' && y[4]=='G' )
-				{
-					B(); B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				else if( b[7]=='W' && r[7]=='O' && r[8]=='O' && y[7]=='G' && y[8]=='G' )
-				{
-					Bs(); D(); Bs(); Ds(); break p3;
-				}
-				
-				//////////////////// BREAKING UP BAD PAIRS
-				
-				// BO
-				
-				if( ( (o[7]=='O' && b[9]=='G' && y[1]=='W')  || (o[7]=='W' && b[9]=='O' && y[1]=='G')  || (o[7]=='G' && b[9]=='W' && y[1]=='O')   )  &&  (  ( o[8]=='O' && y[2]=='G'  ) || ( o[8]=='G' && y[2]=='O') ) )
-				{
-					B(); B(); Rs(); B(); R();
-				}
-				
-				// RB
-				
-				else if( ( (r[7]=='G' && b[7]=='O' && y[7]=='W')  || (r[7]=='W' && b[7]=='G' && y[7]=='O')  || (r[7]=='O' && b[7]=='W' && y[7]=='G') ) &&  ( (b[8]=='O' && y[4]=='G')  || (b[8]=='G' && y[4]=='O') ) )
-				{
-					Bs(); Rs(); B(); R();
-				}
-				
-				else if( ( (r[9]=='O' && g[7]=='G' && y[9]=='W') ||  (r[9]=='W' && g[7]=='O' && y[9]=='G')   || (r[9]=='G' && g[7]=='W' && y[9]=='O') ) && ( (r[8]=='O' && y[8]=='G') || (r[8]=='G' && y[8]=='O') ) )
-				{
-					Rs(); B(); R();
-				}
-				
-				else if( ( (o[9]=='G' && g[9]=='O' && y[3]=='W')  || (o[9]=='W' && g[9]=='G' && y[3]=='O')  || (o[9]=='O' && g[9]=='W' && y[3]=='G') ) &&  ( (g[8]=='O' && y[6]=='G') || (g[8]=='G' && y[6]=='O') ) )
-				{
-					B(); Rs(); B(); R();
-				}
-				
-				//////////////  BAD PAIRS 2
-				
-				if( ( (o[7]=='O' && b[9]=='G' && y[1]=='W')  || (o[7]=='W' && b[9]=='O' && y[1]=='G')  || (o[7]=='G' && b[9]=='W' && y[1]=='O')   ) && ( (b[8]=='O' && y[4]=='G')  || (b[8]=='G' && y[4]=='O') ) )
-				{
-					D(); Bs(); Ds();
-				}
-				
-				else if( ( (r[7]=='G' && b[7]=='O' && y[7]=='W')  || (r[7]=='W' && b[7]=='G' && y[7]=='O')  || (r[7]=='O' && b[7]=='W' && y[7]=='G') ) &&   ( (r[8]=='O' && y[8]=='G') || (r[8]=='G' && y[8]=='O') )  )
-				{
-					B(); D(); Bs(); Ds();
-				}
-				
-				else if(  ( (r[9]=='O' && g[7]=='G' && y[9]=='W') ||  (r[9]=='W' && g[7]=='O' && y[9]=='G')   || (r[9]=='G' && g[7]=='W' && y[9]=='O') ) &&  ( (g[8]=='O' && y[6]=='G') || (g[8]=='G' && y[6]=='O') ) )
-				{
-					B(); B(); D(); Bs(); Ds();
-				}
-				
-				else if(  ( (o[9]=='G' && g[9]=='O' && y[3]=='W')  || (o[9]=='W' && g[9]=='G' && y[3]=='O')  || (o[9]=='O' && g[9]=='W' && y[3]=='G') ) && (  ( o[8]=='O' && y[2]=='G'  ) || ( o[8]=='G' && y[2]=='O') ) )
-				{
-					Bs(); D(); Bs(); Ds();
-				}
-				
-				///////////////////////// WHITE ON TOP
-				
-				/////////////////////  ORANGE TOP
-				
-				if(g[9]=='O' && o[9]=='G' && y[3]=='W' && b[8]=='G' && y[4]=='O')
-				{
-					B(); B(); Rs(); Bs(); R(); Bs(); Rs(); B(); R(); break p3;
-				}
-				
-				else if(b[9]=='G' && o[7]=='O' && y[1]=='W' && r[8]=='G' && y[8]=='O')
-				{
-					Bs(); Rs(); Bs(); R(); Bs(); Rs(); B(); R(); break p3;
-				}
-				
-				else if(r[7]=='G' && b[7]=='O' && y[7]=='W' && y[6]=='O' && g[8]=='G')
-				{
-					Rs(); Bs(); R(); Bs(); Rs(); B(); R(); break p3;
-				}
-				
-				else if(r[9]=='O' && g[7]=='G' && y[9]=='W' && y[2]=='O' && o[8]=='G')
-				{
-					B(); Rs(); Bs(); R(); Bs(); Rs(); B(); R(); break p3;
-				}
-			/////////////////////////////////////////////////////////////////////////////////////////
-				
-				else if(r[9]=='O' && g[7]=='G' && y[9]=='W' && b[8]=='G' && y[4]=='O')
-				{
-					B(); B(); Rs(); B(); B(); R(); Bs(); Rs(); B(); R(); break p3;
-				}
-				
-				else if(g[9]=='O' && o[9]=='G' && y[3]=='W' && r[8]=='G' && y[8]=='O')
-				{
-					Bs(); Rs(); B(); B(); R(); Bs(); Rs(); B(); R(); break p3;
-				}
-				
-				else if(b[9]=='G' && o[7]=='O' && y[1]=='W' && g[8]=='G' && y[6]=='O')
-				{
-					Rs(); B(); B(); R(); Bs(); Rs(); B(); R(); break p3;
-				}
-				
-				else if(r[7]=='G' && b[7]=='O' && y[7]=='W' && o[8]=='G' && y[2]=='O')
-				{
-					B(); Rs(); B(); B(); R(); Bs(); Rs(); B(); R(); break p3;
-				}
-				
-				////////////////////  GREEN TOP
-				
-				else if(g[9]=='O' && o[9]=='G' && y[3]=='W' && r[8]=='O' && y[8]=='G')
-				{
-					B(); B(); D(); B(); Ds(); B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				else if(b[9]=='G' && o[7]=='O' && y[1]=='W' && g[8]=='O' && y[6]=='G')
-				{
-					Bs(); D(); B(); Ds(); B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				else if(r[7]=='G' && b[7]=='O' && y[7]=='W' && y[2]=='G' && o[8]=='O')
-				{
-					D(); B(); Ds(); B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				else if(r[9]=='O' && g[7]=='G' && y[9]=='W' && y[4]=='G' && b[8]=='O')
-				{
-					B(); D(); B(); Ds(); B(); D(); Bs(); Ds(); break p3;
-				}
-			//////////////////////////////////////////////////////////////////////////////////////////////////
-				
-				else if(b[9]=='G' && o[7]=='O' && y[1]=='W' && r[8]=='O' && y[8]=='G')
-				{
-					B(); B(); D(); B(); B(); Ds(); B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				else if(r[7]=='G' && b[7]=='O' && y[7]=='W' && y[6]=='G' && g[8]=='O')
-				{
-					Bs(); D(); B(); B(); Ds(); B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				else if(r[9]=='O' && g[7]=='G' && y[9]=='W' && y[2]=='G' && o[8]=='O')
-				{
-					D(); B(); B(); Ds(); B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				else if(g[9]=='O' && o[9]=='G' && y[3]=='W' && b[8]=='O' && y[4]=='G')
-				{
-					B(); D(); B(); B(); Ds(); B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				////////////////////////// BOTH GREEN TOP 
-				
-				else if(r[9]=='W' && g[7]=='O' && y[9]=='G' && y[2]=='G' && o[8]=='O')
-				{
-					B(); B(); D(); B(); Ds(); B(); B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				else if(g[9]=='W' && o[9]=='O' && y[3]=='G' && y[4]=='G' && b[8]=='O')
-				{
-					Bs(); D(); B(); Ds(); B(); B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				else if(o[7]=='W' && b[9]=='O' && y[1]=='G' && y[8]=='G' && r[8]=='O')
-				{
-					D(); B(); Ds(); B(); B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				else if(b[7]=='W' && r[7]=='O' && y[7]=='G' && y[6]=='G' && g[8]=='O')
-				{
-					B(); D(); B(); Ds(); B(); B(); D(); Bs(); Ds(); break p3;
-				}
-			///////////////////////////////////////////////////////////////////////////////////////	
-			
-				else if(r[9]=='W' && g[7]=='O' && y[9]=='G' && y[4]=='G' && b[8]=='O')
-				{
-					B(); B(); D(); B(); B(); Ds(); B(); B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				else if(g[9]=='W' && o[9]=='O' && y[3]=='G' && y[8]=='G' && r[8]=='O')
-				{
-					Bs(); D(); B(); B(); Ds(); B(); B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				else if(o[7]=='W' && b[9]=='O' && y[1]=='G' && y[6]=='G' && g[8]=='O')
-				{
-					D(); B(); B(); Ds(); B(); B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				else if(b[7]=='W' && r[7]=='O' && y[7]=='G' && y[2]=='G' && o[8]=='O')
-				{
-					B(); D(); B(); B(); Ds(); B(); B(); D(); Bs(); Ds(); break p3;
-				}
-				
-				////////////////////////// BOTH ORANGE TOP
-				
-				else if(b[9]=='W' && o[7]=='G' && y[1]=='O' && y[6]=='O' && g[8]=='G')
-				{
-					B(); B(); Rs(); Bs(); R(); B(); B(); Rs(); B(); R(); break p3;
-				}
-				
-				else if(r[7]=='W' && b[7]=='G' && y[7]=='O' && y[2]=='O' && o[8]=='G')
-				{
-					Bs(); Rs(); Bs(); R(); B(); B(); Rs(); B(); R(); break p3;
-				}
-				
-				else if(g[7]=='W' && r[9]=='G' && y[9]=='O' && y[4]=='O' && b[8]=='G')
-				{
-					Rs(); Bs(); R(); B(); B(); Rs(); B(); R(); break p3;
-				}
-				
-				else if(o[9]=='W' && g[9]=='G' && y[3]=='O' && y[8]=='O' && r[8]=='G')
-				{
-					B(); Rs(); Bs(); R(); B(); B(); Rs(); B(); R(); break p3;
-				}
-			/////////////////////////////////////////////////////////////////////////////////////
-				
-				else if(b[9]=='W' && o[7]=='G' && y[1]=='O' && y[8]=='O' && r[8]=='G')
-				{
-					B(); B(); Rs(); B(); B(); R(); B(); B(); Rs(); B(); R(); break p3;
-				}
-				
-				else if(r[7]=='W' && b[7]=='G' && y[7]=='O' && y[6]=='O' && g[8]=='G')
-				{
-					Bs(); Rs(); B(); B(); R(); B(); B(); Rs(); B(); R(); break p3;
-				}
-				
-				else if(g[7]=='W' && r[9]=='G' && y[9]=='O' && y[2]=='O' && o[8]=='G')
-				{
-					Rs(); B(); B(); R(); B(); B(); Rs(); B(); R(); break p3;
-				}
-				
-				else if(o[9]=='W' && g[9]=='G' && y[3]=='O' && y[4]=='O' && b[8]=='G')
-				{
-					B(); Rs(); B(); B(); R(); B(); B(); Rs(); B(); R(); break p3;
-				}
-				
-				////////////////////////// CORNER ORANGE - EDGE GREEN
-				
-				else if(r[7]=='W' && b[7]=='G' && y[7]=='O' && y[6]=='G' && g[8]=='O')
-				{
-					B(); B(); D(); B(); Ds(); break p3;
-				}
-				
-				else if(g[7]=='W' && r[9]=='G' && y[9]=='O' && y[2]=='G' && o[8]=='O')
-				{
-					Bs(); D(); B(); Ds(); break p3;
-				}
-				
-				else if(o[9]=='W' && g[9]=='G' && y[3]=='O' && y[4]=='G' && b[8]=='O')
-				{
-					D(); B(); Ds(); break p3;
-				}
-				
-				else if(b[9]=='W' && o[7]=='G' && y[1]=='O' && y[8]=='G' && r[8]=='O')
-				{
-					B(); D(); B(); Ds(); break p3;
-				}
-			/////////////////////////////////////////////////////////////////////////////////////
-				
-				else if(b[9]=='W' && o[7]=='G' && y[1]=='O' && y[6]=='G' && g[8]=='O')
-				{
-					B(); B(); Rs(); B(); R(); Bs(); D(); B(); Ds(); break p3;
-				}
-				
-				else if(r[7]=='W' && b[7]=='G' && y[7]=='O' && y[2]=='G' && o[8]=='O')
-				{
-					Bs(); Rs(); B(); R(); Bs(); D(); B(); Ds(); break p3;
-				}
-				
-				else if(g[7]=='W' && r[9]=='G' && y[9]=='O' && y[4]=='G' && b[8]=='O')
-				{
-					Rs(); B(); R(); Bs(); D(); B(); Ds(); break p3;
-				}
-				
-				else if(o[9]=='W' && g[9]=='G' && y[3]=='O' && y[8]=='G' && r[8]=='O')
-				{
-					B(); Rs(); B(); R(); Bs(); D(); B(); Ds(); break p3;
-				}
-				
-				////////////////////////// CORNER GREEN - EDGE ORANGE
-				
-				else if(b[7]=='W' && r[7]=='O' && y[7]=='G' && y[2]=='O' && o[8]=='G')
-				{
-					B(); B(); Rs(); Bs(); R(); break p3;
-				}
-				
-				else if(r[9]=='W' && g[7]=='O' && y[9]=='G' && y[4]=='O' && b[8]=='G')
-				{
-					Bs(); Rs(); Bs(); R(); break p3;
-				}
-				
-				else if(g[9]=='W' && o[9]=='O' && y[3]=='G' && y[8]=='O' && r[8]=='G')
-				{
-					Rs(); Bs(); R(); break p3;
-				}
-				
-				else if(o[7]=='W' && b[9]=='O' && y[1]=='G' && y[6]=='O' && g[8]=='G')
-				{
-					B(); Rs(); Bs(); R(); break p3;
-				}
-				
-			/////////////////////////////////////////////////////////////////////////////////
-				
-				else if(o[7]=='W' && b[9]=='O' && y[1]=='G' &&  y[8]=='O' && r[8]=='G')
-				{
-					B(); B(); Rs(); Bs(); R(); Bs(); Rs(); Bs(); R(); break p3;
-				}
-				
-				else if(b[7]=='W' && r[7]=='O' && y[7]=='G' && y[6]=='O' && g[8]=='G')
-				{
-					Bs(); Rs(); Bs(); R(); Bs(); Rs(); Bs(); R(); break p3;
-				}
-				
-				else if(r[9]=='W' && g[7]=='O' && y[9]=='G' && y[2]=='O' && o[8]=='G')
-				{
-					Rs(); Bs(); R(); Bs(); Rs(); Bs(); R(); break p3;
-				}
-				
-				else if(g[9]=='W' && o[9]=='O' && y[3]=='G' && y[4]=='O' && b[8]=='G')
-				{
-					B(); Rs(); Bs(); R(); Bs(); Rs(); Bs(); R(); break p3;
-				}
-			}		
-		}	
-	}
-	
-	else if(n==3)
-	{	//OB
-		p4:
-		{
-			if(f2l_bo()==0)	// OB F2L
-			{
-				
-				//////////////////  FIRST TO THIRD
-				
-				if(	 (w[1]=='W' && r[1]=='B' && b[1]=='O') ||	(w[1]=='O' && r[1]=='W' && b[1]=='B') || (w[1]=='B' && r[1]=='O' && b[1]=='W')	)
-				{
-					Ls(); Bs(); L();
-				}
-				
-				else if(  (w[3]=='W' && r[3]=='O' && g[1]=='B') || (w[3]=='B' && r[3]=='W' && g[1]=='O') || (w[3]=='O' && r[3]=='B' && g[1]=='W')  )
-				{
-					R(); Bs(); Rs(); 
-				}
-				
-				else if(  (w[9]=='W' && g[3]=='O' && o[3]=='B') || (w[9]=='B' && g[3]=='W' && o[3]=='O') || (w[9]=='O' && g[3]=='B' && o[3]=='W')   )
-				{
-					Rs(); Bs(); R();
-				}
-				
-				else if(  (w[7]=='B' && b[3]=='O' && o[1]=='W') || (w[7]=='W' && b[3]=='B' && o[1]=='O') || (w[7]=='O' && b[3]=='W' && o[1]=='B')   )
-				{
-					L(); Bs(); Ls();
-				}
-				
-				//////////////////  SECOND TO THIRD
-				
-				if( (r[4]=='O' && b[4]=='B') || (r[4]=='B' && b[4]=='O') )		//BR
-				{
-					if(	(r[7]=='W' && b[7]=='O' && y[7]=='B')  || (r[7]=='B' && b[7]=='W' && y[7]=='O')  || (r[7]=='O' && b[7]=='B' && y[7]=='W') )
-					{
-						U(); Bs(); Us();
-					}
-					else
-					{
-						U(); B(); Us();
-					}
-				}
-				
-				else if( ( r[6]=='O' && g[4]=='B' )  || ( r[6]=='B' && g[4]=='O' )  )		//RG
-				{
-					if( ( r[9]=='W' && g[7]=='B' && y[9]=='O' ) || ( r[9]=='O' && g[7]=='W' && y[9]=='B' ) || ( r[9]=='B' && g[7]=='O' && y[9]=='W' )  )
-					{
-						R(); Bs(); Rs();
-					}
-					else
-					{
-						R(); B(); Rs();
-					}
-				}
-				
-				else if( ( g[6]=='O' && o[6]=='B' )  || ( g[6]=='B' && o[6]=='O' ) )		//OG
-				{
-					if( (  g[9]=='O' && o[9]=='W' && y[3]=='B'	) || (  g[9]=='B' && o[9]=='O' && y[3]=='W' ) || (  g[9]=='W' && o[9]=='B' && y[3]=='O'	)  )
-					{
-						D(); Bs(); Ds();
-					}
-					else
-					{
-						D(); B(); Ds();
-					}
-				}
-				
-				else if( (b[6]=='O' && o[4]=='B')  || (b[6]=='B' && o[4]=='O')  ) 	//OB
-				{
-					if( ( o[7]=='B' && b[9]=='O' && y[1]=='W' ) || ( o[7]=='W' && b[9]=='B' && y[1]=='O' ) || ( o[7]=='O' && b[9]=='W' && y[1]=='B' ) )
-					{
-						L(); Bs(); Ls();
-					}
-					else
-					{
-						L(); B(); Ls();
-					}
-				}
-		
-				//////////////////////  PAIR UP COMPLETE
-				
-				if( r[9]=='W' && g[7]=='B' && g[8]=='B' && y[6]=='O' && y[9]=='O')
-				{
-					Bs(); L(); Bs(); Ls(); break p4;
-				}
-				
-				else if( g[9]=='W' && o[8]=='B' && o[9]=='B' && y[2]=='O' && y[3]=='O' )
-				{
-					L(); Bs(); Ls(); break p4;
-				}
-				
-				else if( o[7]=='W' && b[8]=='B' && b[9]=='B' && y[1]=='O' && y[4]=='O' )
-				{
-					B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				else if( b[7]=='W' && r[7]=='B' && r[8]=='B' && y[7]=='O' && y[8]=='O' )
-				{
-					B(); B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				//////////////////// BREAKING UP BAD PAIRS
-				
-				// BO
-				
-				if( ( (o[7]=='B' && b[9]=='O' && y[1]=='W')  || (o[7]=='W' && b[9]=='B' && y[1]=='O')  || (o[7]=='O' && b[9]=='W' && y[1]=='B')   )  &&  (  ( o[8]=='O' && y[2]=='B'  ) || ( o[8]=='B' && y[2]=='O') ) )
-				{
-					B(); Ds(); B(); D();
-				}
-				
-				// RB
-				
-				else if( ( (r[7]=='O' && b[7]=='B' && y[7]=='W')  || (r[7]=='W' && b[7]=='O' && y[7]=='B')  || (r[7]=='B' && b[7]=='W' && y[7]=='O') ) &&  ( (b[8]=='O' && y[4]=='B')  || (b[8]=='B' && y[4]=='O') ) )
-				{
-					B(); B(); Ds(); B(); D();
-				}
-				
-				else if( ( (r[9]=='B' && g[7]=='O' && y[9]=='W') ||  (r[9]=='W' && g[7]=='B' && y[9]=='O')   || (r[9]=='O' && g[7]=='W' && y[9]=='B') ) && ( (r[8]=='O' && y[8]=='B') || (r[8]=='B' && y[8]=='O') ) )
-				{
-					Bs(); Ds(); B(); D();
-				}
-				
-				else if( ( (o[9]=='O' && g[9]=='B' && y[3]=='W')  || (o[9]=='W' && g[9]=='O' && y[3]=='B')  || (o[9]=='B' && g[9]=='W' && y[3]=='O') ) &&  ( (g[8]=='O' && y[6]=='B') || (g[8]=='B' && y[6]=='O') ) )
-				{
-					Ds(); B(); D(); 
-				}
-				
-				//////////////  BAD PAIRS 2
-				
-				if( ( (o[7]=='B' && b[9]=='O' && y[1]=='W')  || (o[7]=='W' && b[9]=='B' && y[1]=='O')  || (o[7]=='O' && b[9]=='W' && y[1]=='B')   ) && ( (b[8]=='O' && y[4]=='B')  || (b[8]=='B' && y[4]=='O') ) )
-				{
-					Bs(); L(); Bs(); Ls();
-				}
-				
-				else if( ( (r[7]=='O' && b[7]=='B' && y[7]=='W')  || (r[7]=='W' && b[7]=='O' && y[7]=='B')  || (r[7]=='B' && b[7]=='W' && y[7]=='O') ) &&   ( (r[8]=='O' && y[8]=='B') || (r[8]=='B' && y[8]=='O') ) )
-				{
-					L(); Bs(); Ls();
-				}
-				
-				else if(  ( (r[9]=='B' && g[7]=='O' && y[9]=='W') ||  (r[9]=='W' && g[7]=='B' && y[9]=='O')   || (r[9]=='O' && g[7]=='W' && y[9]=='B') ) &&  ( (g[8]=='O' && y[6]=='B') || (g[8]=='B' && y[6]=='O') ) )
-				{
-					B(); L(); Bs(); Ls();
-				}
-				
-				else if(  ( (o[9]=='O' && g[9]=='B' && y[3]=='W')  || (o[9]=='W' && g[9]=='O' && y[3]=='B')  || (o[9]=='B' && g[9]=='W' && y[3]=='O') ) && (  ( o[8]=='O' && y[2]=='B'  ) || ( o[8]=='B' && y[2]=='O') ) )
-				{
-					B(); B(); L(); Bs(); Ls();
-				}
-				
-				///////////////////////// WHITE ON TOP
-				
-				/////////////////////  ORANGE TOP
-				
-				if(g[9]=='B' && o[9]=='O' && y[3]=='W' && b[8]=='B' && y[4]=='O')
-				{
-					L(); B(); B(); Ls(); B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				else if(b[9]=='O' && o[7]=='B' && y[1]=='W' && r[8]=='B' && y[8]=='O')
-				{
-					B(); L(); B(); B(); Ls(); B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				else if(r[7]=='O' && b[7]=='B' && y[7]=='W' && y[6]=='O' && g[8]=='B')
-				{
-					B(); B(); L(); B(); B(); Ls(); B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				else if(r[9]=='B' && g[7]=='O' && y[9]=='W' && y[2]=='O' && o[8]=='B')
-				{
-					Bs(); L(); B(); B(); Ls(); B(); L(); Bs(); Ls(); break p4;
-				}
-			/////////////////////////////////////////////////////////////////////////////////////////
-				
-				else if(r[9]=='B' && g[7]=='O' && y[9]=='W' && b[8]=='B' && y[4]=='O')
-				{
-					L(); B(); Ls(); B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				else if(g[9]=='B' && o[9]=='O' && y[3]=='W' && r[8]=='B' && y[8]=='O')
-				{
-					B(); L(); B(); Ls(); B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				else if(b[9]=='O' && o[7]=='B' && y[1]=='W' && g[8]=='B' && y[6]=='O')
-				{
-					B(); B(); L(); B(); Ls(); B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				else if(r[7]=='O' && b[7]=='B' && y[7]=='W' && o[8]=='B' && y[2]=='O')
-				{
-					Bs(); L(); B(); Ls(); B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				////////////////////  BLUE TOP
-				
-				else if(g[9]=='B' && o[9]=='O' && y[3]=='W' && r[8]=='O' && y[8]=='B')
-				{
-					B(); B(); Ds(); B(); B(); D(); Bs(); Ds(); B(); D(); break p4;
-				}
-				
-				else if(b[9]=='O' && o[7]=='B' && y[1]=='W' && g[8]=='O' && y[6]=='B')
-				{
-					Bs(); Ds(); B(); B(); D(); Bs(); Ds(); B(); D(); break p4;
-				}
-				
-				else if(r[7]=='O' && b[7]=='B' && y[7]=='W' && y[2]=='B' && o[8]=='O')
-				{
-					Ds(); B(); B(); D(); Bs(); Ds(); B(); D(); break p4;
-				}
-				
-				else if(r[9]=='B' && g[7]=='O' && y[9]=='W' && y[4]=='B' && b[8]=='O')
-				{
-					B(); Ds(); B(); B(); D(); Bs(); Ds(); B(); D(); break p4;
-				}
-			//////////////////////////////////////////////////////////////////////////////////////////////////
-				
-				else if(b[9]=='O' && o[7]=='B' && y[1]=='W' && r[8]=='O' && y[8]=='B')
-				{
-					B(); B(); Ds(); Bs(); D(); Bs(); Ds(); B(); D(); break p4;
-				}
-				
-				else if(r[7]=='O' && b[7]=='B' && y[7]=='W' && y[6]=='B' && g[8]=='O')
-				{
-					Bs(); Ds(); Bs(); D(); Bs(); Ds(); B(); D(); break p4;
-				}
-				
-				else if(r[9]=='B' && g[7]=='O' && y[9]=='W' && y[2]=='B' && o[8]=='O')
-				{
-					Ds(); Bs(); D(); Bs(); Ds(); B(); D(); break p4;
-				}
-				
-				else if(g[9]=='B' && o[9]=='O' && y[3]=='W' && b[8]=='O' && y[4]=='B')
-				{
-					B(); Ds(); Bs(); D(); Bs(); Ds(); B(); D(); break p4;
-				}
-				
-				////////////////////////// BOTH BLUE TOP 
-				
-				else if(r[9]=='O' && g[7]=='W' && y[9]=='B' && y[2]=='B' && o[8]=='O')
-				{
-					Bs(); Ds(); B(); B(); D(); B(); B(); Ds(); B(); D(); break p4;
-				}
-				
-				else if(g[9]=='O' && o[9]=='W' && y[3]=='B' && y[4]=='B' && b[8]=='O')
-				{
-					Ds(); B(); B(); D(); B(); B(); Ds(); B(); D(); break p4;
-				}
-				
-				else if(o[7]=='O' && b[9]=='W' && y[1]=='B' && y[8]=='B' && r[8]=='O')
-				{
-					B(); Ds(); B(); B(); D(); B(); B(); Ds(); B(); D(); break p4;
-				}
-				
-				else if(b[7]=='O' && r[7]=='W' && y[7]=='B' && y[6]=='B' && g[8]=='O')
-				{
-					B(); B(); Ds(); B(); B(); D(); B(); B(); Ds(); B(); D(); break p4;
-				}
-			///////////////////////////////////////////////////////////////////////////////////////	
-			
-				else if(r[9]=='O' && g[7]=='W' && y[9]=='B' && y[4]=='B' && b[8]=='O')
-				{
-					Bs(); Ds(); Bs(); D(); B(); B(); Ds(); B(); D(); break p4;
-				}
-				
-				else if(g[9]=='O' && o[9]=='W' && y[3]=='B' && y[8]=='B' && r[8]=='O')
-				{
-					Ds(); Bs(); D(); B(); B(); Ds(); B(); D(); break p4;
-				}
-				
-				else if(o[7]=='O' && b[9]=='W' && y[1]=='B' && y[6]=='B' && g[8]=='O')
-				{
-					B(); Ds(); Bs(); D(); B(); B(); Ds(); B(); D(); break p4;
-				}
-				
-				else if(b[7]=='O' && r[7]=='W' && y[7]=='B' && y[2]=='B' && o[8]=='O')
-				{
-					B(); B(); Ds(); Bs(); D(); B(); B(); Ds(); B(); D(); break p4;
-				}
-				
-				////////////////////////// BOTH ORANGE TOP
-				
-				else if(b[9]=='B' && o[7]=='W' && y[1]=='O' && y[6]=='O' && g[8]=='B')
-				{
-					Bs(); L(); B(); B(); Ls(); B(); B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				else if(r[7]=='B' && b[7]=='W' && y[7]=='O' && y[2]=='O' && o[8]=='B')
-				{
-					L(); B(); B(); Ls(); B(); B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				else if(g[7]=='B' && r[9]=='W' && y[9]=='O' && y[4]=='O' && b[8]=='B')
-				{
-					B(); L(); B(); B(); Ls(); B(); B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				else if(o[9]=='B' && g[9]=='W' && y[3]=='O' && y[8]=='O' && r[8]=='B')
-				{
-					B(); B(); L(); B(); B(); Ls(); B(); B(); L(); Bs(); Ls(); break p4;
-				}
-			/////////////////////////////////////////////////////////////////////////////////////
-				
-				else if(b[9]=='B' && o[7]=='W' && y[1]=='O' && y[8]=='O' && r[8]=='B')
-				{
-					Bs(); L(); B(); Ls(); B(); B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				else if(r[7]=='B' && b[7]=='W' && y[7]=='O' && y[6]=='O' && g[8]=='B')
-				{
-					L(); B(); Ls(); B(); B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				else if(g[7]=='B' && r[9]=='W' && y[9]=='O' && y[2]=='O' && o[8]=='B')
-				{
-					B(); L(); B(); Ls(); B(); B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				else if(o[9]=='B' && g[9]=='W' && y[3]=='O' && y[4]=='O' && b[8]=='B')
-				{
-					B(); B(); L(); B(); Ls(); B(); B(); L(); Bs(); Ls(); break p4;
-				}
-				
-				////////////////////////// CORNER ORANGE - EDGE BLUE
-				
-				else if(r[7]=='B' && b[7]=='W' && y[7]=='O' && y[6]=='B' && g[8]=='O')
-				{
-					B(); B(); Ds(); Bs(); D(); Bs(); Ds(); Bs(); D(); break p4;
-				}
-				
-				else if(g[7]=='B' && r[9]=='W' && y[9]=='O' && y[2]=='B' && o[8]=='O')
-				{
-					Bs(); Ds(); Bs(); D(); Bs(); Ds(); Bs(); D(); break p4;
-				}
-				
-				else if(o[9]=='B' && g[9]=='W' && y[3]=='O' && y[4]=='B' && b[8]=='O')
-				{
-					Ds(); Bs(); D(); Bs(); Ds(); Bs(); D(); break p4;
-				}
-				
-				else if(b[9]=='B' && o[7]=='W' && y[1]=='O' && y[8]=='B' && r[8]=='O')
-				{
-					B(); Ds(); Bs(); D(); Bs(); Ds(); Bs(); D(); break p4;
-				}
-			/////////////////////////////////////////////////////////////////////////////////////
-				
-				else if(b[9]=='B' && o[7]=='W' && y[1]=='O' && y[6]=='B' && g[8]=='O')
-				{
-					Ds(); Bs(); D(); break p4;
-				}
-				
-				else if(r[7]=='B' && b[7]=='W' && y[7]=='O' && y[2]=='B' && o[8]=='O')
-				{
-					B(); Ds(); Bs(); D(); break p4;
-				}
-				
-				else if(g[7]=='B' && r[9]=='W' && y[9]=='O' && y[4]=='B' && b[8]=='O')
-				{
-					B(); B(); Ds(); Bs(); D(); break p4;
-				}
-				
-				else if(o[9]=='B' && g[9]=='W' && y[3]=='O' && y[8]=='B' && r[8]=='O')
-				{
-					Bs(); Ds(); Bs(); D(); break p4;
-				}
-				
-				////////////////////////// CORNER BLUE - EDGE ORANGE
-				
-				else if(b[7]=='O' && r[7]=='W' && y[7]=='B' && y[2]=='O' && o[8]=='B')
-				{
-					L(); B(); Ls(); B(); L(); B(); Ls(); break p4;
-				}
-				
-				else if(r[9]=='O' && g[7]=='W' && y[9]=='B' && y[4]=='O' && b[8]=='B')
-				{
-					B(); L(); B(); Ls(); B(); L(); B(); Ls(); break p4;
-				}
-				
-				else if(g[9]=='O' && o[9]=='W' && y[3]=='B' && y[8]=='O' && r[8]=='B')
-				{
-					B(); B(); L(); B(); Ls(); B(); L(); B(); Ls(); break p4;
-				}
-				
-				else if(o[7]=='O' && b[9]=='W' && y[1]=='B' && y[6]=='O' && g[8]=='B')
-				{
-					Bs(); L(); B(); Ls(); B(); L(); B(); Ls(); break p4;
-				}
-				
-			/////////////////////////////////////////////////////////////////////////////////
-				
-				else if(o[7]=='O' && b[9]=='W' && y[1]=='B' &&  y[8]=='O' && r[8]=='B')
-				{
-					L(); B(); Ls(); break p4;
-				}
-				
-				else if(b[7]=='O' && r[7]=='W' && y[7]=='B' && y[6]=='O' && g[8]=='B')
-				{
-					B(); L(); B(); Ls(); break p4;
-				}
-				
-				else if(r[9]=='O' && g[7]=='W' && y[9]=='B' && y[2]=='O' && o[8]=='B')
-				{
-					B(); B(); L(); B(); Ls(); break p4;
-				}
-				
-				else if(g[9]=='O' && o[9]=='W' && y[3]=='B' && y[4]=='O' && b[8]=='B')
-				{
-					Bs(); L(); B(); Ls(); break p4;
-				}
-			}		
-		}
-	}
+function help2() {
+  alert('When ON, the solution will be the set of moves that will transform a Solved Cube into the Input State');
 }

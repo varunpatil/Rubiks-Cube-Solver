@@ -1,0 +1,142 @@
+{
+  "solved": {
+    "name": "solved",
+    "scramble": "",
+    "invalid": false,
+    "color": "WHITE",
+    "moveCount": 0,
+    "solution": "",
+    "text": "",
+    "solves": true
+  },
+  "single_R": {
+    "name": "single_R",
+    "scramble": "R",
+    "invalid": false,
+    "color": "WHITE",
+    "moveCount": 1,
+    "solution": "r",
+    "text": "r \nNo of Moves = 1\nWHITE",
+    "solves": true
+  },
+  "single_Fprime": {
+    "name": "single_Fprime",
+    "scramble": "Fs",
+    "invalid": false,
+    "color": "ORANGE",
+    "moveCount": 1,
+    "solution": "F",
+    "text": "F \nNo of Moves = 1\nORANGE",
+    "solves": true
+  },
+  "short_1": {
+    "name": "short_1",
+    "scramble": "R U F",
+    "invalid": false,
+    "color": "ORANGE",
+    "moveCount": 3,
+    "solution": "fur",
+    "text": "f u r \nNo of Moves = 3\nORANGE",
+    "solves": true
+  },
+  "short_2": {
+    "name": "short_2",
+    "scramble": "L Ds B Us",
+    "invalid": false,
+    "color": "YELLOW",
+    "moveCount": 52,
+    "solution": "ubUBBUblDUUDfdFlFLfrFRFFrFFRfrFRFLFlfRFFrfRfrDfuFdfU",
+    "text": "u b U B \nB U b l \nD U U D \nf d F l \nF L f r \nF R F F \nr F F R \nf r F R \nF L F l \nf R F F \nr f R f \nr D f u \nF d f U \nNo of Moves = 52\nYELLOW",
+    "solves": true
+  },
+  "sexy": {
+    "name": "sexy",
+    "scramble": "R U Rs Us",
+    "invalid": false,
+    "color": "ORANGE",
+    "moveCount": 4,
+    "solution": "URur",
+    "text": "U R u r \nNo of Moves = 4\nORANGE",
+    "solves": true
+  },
+  "sexy_x2": {
+    "name": "sexy_x2",
+    "scramble": "R U Rs Us R U Rs Us",
+    "invalid": false,
+    "color": "ORANGE",
+    "moveCount": 64,
+    "solution": "RuruRUUrUURurUFUUfuFufuFUUfuFufuluLulUULRUrURUUrBUUbuBubfUUFUfUF",
+    "text": "R u r u \nR U U r \nU U R u \nr U F U \nU f u F \nu f u F \nU U f u \nF u f u \nl u L u \nl U U L \nR U r U \nR U U r \nB U U b \nu B u b \nf U U F \nU f U F \nNo of Moves = 64\nORANGE",
+    "solves": true
+  },
+  "tperm_ish": {
+    "name": "tperm_ish",
+    "scramble": "R U Rs Us Rs F R F",
+    "invalid": false,
+    "color": "ORANGE",
+    "moveCount": 46,
+    "solution": "FFBLUlubLFUfuluLUUluLulFubUfuBfuFufUUFBUbUBUUb",
+    "text": "F F B L \nU l u b \nL F U f \nu l u L \nU U l u \nL u l F \nu b U f \nu B f u \nF u f U \nU F B U \nb U B U \nU b \nNo of Moves = 46\nORANGE",
+    "solves": true
+  },
+  "medium_1": {
+    "name": "medium_1",
+    "scramble": "F R U Bs L Ds F R",
+    "invalid": false,
+    "color": "GREEN",
+    "moveCount": 62,
+    "solution": "RfrDfdRDrublBBLbfLFLLFLfLFlfBLbLuLULBLbLBlbDLdlDLLdlDldFlbLflB",
+    "text": "R f r D \nf d R D \nr u b l \nB B L b \nf L F L \nL F L f \nL F l f \nB L b L \nu L U L \nB L b L \nB l b D \nL d l D \nL L d l \nD l d F \nl b L f \nl B \nNo of Moves = 62\nGREEN",
+    "solves": true
+  },
+  "medium_2": {
+    "name": "medium_2",
+    "scramble": "U R D L F B Rs Us",
+    "invalid": false,
+    "color": "WHITE",
+    "moveCount": 58,
+    "solution": "RdrDldFrfRbrUBuLBlBLblBDbdUBUUbUUbuBlBLURBrBubUbubuBDbUBdb",
+    "text": "R d r D \nl d F r \nf R b r \nU B u L \nB l B L \nb l B D \nb d U B \nU U b U \nU b u B \nl B L U \nR B r B \nu b U b \nu b u B \nD b U B \nd b \nNo of Moves = 58\nWHITE",
+    "solves": true
+  },
+  "medium_3": {
+    "name": "medium_3",
+    "scramble": "D Fs R U Ls B D Rs U",
+    "invalid": false,
+    "color": "YELLOW",
+    "moveCount": 63,
+    "solution": "RurdLrdRfrUfuLfLLfLFFlFLRfrFFRfrFuFFUfuFUDRFrfdFRflFrfLrFLfRFlf",
+    "text": "R u r d \nL r d R \nf r U f \nu L f L \nL f L F \nF l F L \nR f r F \nF R f r \nF u F F \nU f u F \nU D R F \nr f d F \nR f l F \nr f L r \nF L f R \nF l f \nNo of Moves = 63\nYELLOW",
+    "solves": true
+  },
+  "long_1": {
+    "name": "long_1",
+    "scramble": "R U F L D B Rs Us Fs Ls Ds Bs",
+    "invalid": false,
+    "color": "GREEN",
+    "moveCount": 58,
+    "solution": "fUdblBulUluLUDldlblBlbLBLdLLDLLdLDLLfLFlULuFLLflFlfUldLulD",
+    "text": "f U d b \nl B u l \nU l u L \nU D l d \nl b l B \nl b L B \nL d L L \nD L L d \nL D L L \nf L F l \nU L u F \nL L f l \nF l f U \nl d L u \nl D \nNo of Moves = 58\nGREEN",
+    "solves": true
+  },
+  "long_2": {
+    "name": "long_2",
+    "scramble": "F F R R U U L L B B D D",
+    "invalid": false,
+    "color": "RED",
+    "moveCount": 12,
+    "solution": "DDFFRRDDLLBB",
+    "text": "D D F F \nR R D D \nL L B B \nNo of Moves = 12\nRED",
+    "solves": true
+  },
+  "long_3": {
+    "name": "long_3",
+    "scramble": "R L U D F B R L U D F B Rs Us",
+    "invalid": false,
+    "color": "YELLOW",
+    "moveCount": 64,
+    "solution": "URblBdUbRBFLflFFLFFlFLflFFDfDDFDFRFrFRfrFFrfRFFrFRFUFFufUFFdFufD",
+    "text": "U R b l \nB d U b \nR B F L \nf l F F \nL F F l \nF L f l \nF F D f \nD D F D \nF R F r \nF R f r \nF F r f \nR F F r \nF R F U \nF F u f \nU F F d \nF u f D \nNo of Moves = 64\nYELLOW",
+    "solves": true
+  }
+}
