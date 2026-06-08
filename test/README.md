@@ -21,6 +21,8 @@ scramble — the contract that proves the algorithm is unchanged.
 - `Rubik.original.js` — the pre-refactor solver, kept as the equivalence reference.
 - `transpile.mjs` — generated `js/tables.js` (the `WHITE_CROSS` / `SECOND_LAYER`
   lookup tables) from the original `goWC` / `goL2` ladders.
+- `gen-cycles.mjs` — extracted the `Cube.MOVE_CYCLES` data (the data-driven turns)
+  from the verified swap-based moves.
 - `gen-svg.mjs` — generated `images/orientation.svg` (the isometric "how to hold" cube).
 
 ## Usage
